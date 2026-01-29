@@ -1,0 +1,149 @@
+"""
+MÓDULO DE PRECISIÓN (15M y 5M)
+"""
+import time
+from datetime import datetime
+from datos import obtener_velas, calcular_pips
+from config import direccion_global, PARES, MAX_PIPS_SL, RATIO_2VELAS, RATIO_1VELA
+from notificacion import notificar_entrada
+
+def buscar_entradas_15m():
+    """Busca entradas cada 15 minutos"""
+    return buscar_entradas('15min')
+
+def buscar_entradas_5m():
+    """Busca entradas cada 5 minutos"""
+    return buscar_entradas('5min')
+
+def buscar_entradas(intervalo):
+    """Busca entradas en el intervalo especificado"""
+    print(f"\n[{datetime.now().strftime('%H:%M:%S')}] 🔎 Buscando entradas {intervalo}")
+    
+    señales = []
+    
+    for par in PARES:
+        direccion = direccion_global[par]
+        if not direccion:
+            continue
+            
+        try:
+            # Obtener velas
+            df = obtener_velas(par, intervalo, 6)
+            if df is None or len(df) < 4:
+                continue
+            
+            # Buscar según dirección
+            if direccion == "LONG":
+                señal = buscar_patron_long(df, par, intervalo)
+            elif direccion == "SHORT":
+                señal = buscar_patron_short(df, par, intervalo)
+                
+            if señal:
+                señales.append(señal)
+                notificar_entrada(señal)
+                print(f"  ✅ {par}: {señal['tipo']}")
+                
+        except Exception as e:
+            print(f"  ❌ Error {par}: {e}")
+    
+    return señales
+
+def buscar_patron_long(df, par, intervalo):
+    """Busca patrón LONG en las últimas velas"""
+    # Verificar que hay suficientes velas
+    if len(df) < 3:
+        return None
+    
+    # Tomar las últimas 3 velas
+    vela1 = df.iloc[-3]  # Antepenúltima
+    vela2 = df.iloc[-2]  # Penúltima
+    vela3 = df.iloc[-1]  # Última
+    
+    # Patrón 1: Última vela alcista y 2 anteriores bajistas
+    if (vela1['close'] < vela1['open'] and  # Primera vela bajista
+        vela2['close'] < vela2['open'] and  # Segunda vela bajista
+        vela3['close'] > vela3['open']):    # Última vela alcista
+        
+        # Verificar que la última vela cierra arriba del máximo anterior
+        if vela3['close'] >= vela2['high']:
+            return crear_señal('LONG_2VELAS', par, intervalo, vela3, df, len(df)-1, RATIO_2VELAS)
+    
+    # Patrón 2: Última vela alcista y la anterior bajista
+    elif (vela2['close'] < vela2['open'] and  # Vela anterior bajista
+          vela3['close'] > vela3['open']):    # Última vela alcista
+        
+        # Verificar que la última vela cierra arriba del máximo de la vela anterior
+        if vela3['close'] >= vela2['high']:
+            return crear_señal('LONG_1VELA', par, intervalo, vela3, df, len(df)-1, RATIO_1VELA)
+    
+    return None
+
+def buscar_patron_short(df, par, intervalo):
+    """Busca patrón SHORT en las últimas velas"""
+    # Verificar que hay suficientes velas
+    if len(df) < 3:
+        return None
+    
+    # Tomar las últimas 3 velas
+    vela1 = df.iloc[-3]  # Penúltima
+    vela2 = df.iloc[-2]  # Antepenúltima
+    vela3 = df.iloc[-1]  # Última
+    
+    # Patrón 1: Última vela bajista y 2 anteriores alcistas
+    if (vela1['close'] > vela1['open'] and  # Primera vela alcista
+        vela2['close'] > vela2['open'] and  # Segunda vela alcista
+        vela3['close'] < vela3['open']):    # Última vela bajista
+        
+        # Verificar que la última vela cierra abajo del mínimo anterior
+        if vela3['close'] <= vela2['low']:
+            return crear_señal('SHORT_2VELAS', par, intervalo, vela3, df, len(df)-1, RATIO_2VELAS, False)
+    
+    # Patrón 2: Última vela bajista y la anterior alcista
+    elif (vela2['close'] > vela2['open'] and  # Vela anterior alcista
+          vela3['close'] < vela3['open']):    # Última vela bajista
+        
+        # Verificar que la última vela cierra abajo del mínimo de la vela anterior
+        if vela3['close'] <= vela2['low']:
+            return crear_señal('SHORT_1VELA', par, intervalo, vela3, df, len(df)-1, RATIO_1VELA, False)
+    
+    return None
+
+
+
+def crear_señal(tipo, par, intervalo, vela_entrada, df, idx, ratio, es_long=True):
+    """Crea señal con todos los parámetros"""
+    entrada = vela_entrada['close']
+    
+    # Calcular SL
+    if es_long:
+        sl_precio = df.iloc[:idx]['low'].min()
+    else:
+        sl_precio = df.iloc[:idx]['high'].max()
+    
+    # Ajustar SL por pips máximos
+    pips = calcular_pips(par, entrada, sl_precio)
+    if pips > MAX_PIPS_SL:
+        ajuste = MAX_PIPS_SL / (100 if "JPY" in par else 10000)
+        if es_long:
+            sl_precio = entrada - ajuste
+        else:
+            sl_precio = entrada + ajuste
+        pips = MAX_PIPS_SL
+    
+    # Calcular TP
+    riesgo = abs(entrada - sl_precio)
+    if es_long:
+        tp = entrada + (riesgo * ratio)
+    else:
+        tp = entrada - (riesgo * ratio)
+    
+    return {
+        'par': par,
+        'tipo': tipo,
+        'temporalidad': intervalo,
+        'entrada': float(entrada),
+        'sl': float(sl_precio),
+        'tp': float(tp),
+        'pips_sl': pips,
+        'ratio': ratio
+    }
