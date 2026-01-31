@@ -28,7 +28,8 @@ def buscar_entradas(intervalo):
             
         try:
             # Obtener velas
-            df = obtener_velas(par, intervalo, 6)
+            data = obtener_velas(par, intervalo, 6)
+            df = data[0]
             if df is None or len(df) < 4:
                 continue
             
@@ -55,15 +56,14 @@ def buscar_patron_long(df, par, intervalo):
         return None
     
     # Tomar las últimas 3 velas
-    vela1 = df.iloc[-3]  # Antepenúltima
-    vela2 = df.iloc[-2]  # Penúltima
-    vela3 = df.iloc[-1]  # Última
+    vela1 = df.iloc[2]  # Antepenúltima
+    vela2 = df.iloc[1]  # Penúltima
+    vela3 = df.iloc[0]  # Última
     
     # Patrón 1: Última vela alcista y 2 anteriores bajistas
     if (vela1['close'] < vela1['open'] and  # Primera vela bajista
         vela2['close'] < vela2['open'] and  # Segunda vela bajista
         vela3['close'] > vela3['open']):    # Última vela alcista
-        
         # Verificar que la última vela cierra arriba del máximo anterior
         if vela3['close'] >= vela2['high']:
             return crear_señal('LONG_2VELAS', par, intervalo, vela3, df, len(df)-1, RATIO_2VELAS)
@@ -71,7 +71,6 @@ def buscar_patron_long(df, par, intervalo):
     # Patrón 2: Última vela alcista y la anterior bajista
     elif (vela2['close'] < vela2['open'] and  # Vela anterior bajista
           vela3['close'] > vela3['open']):    # Última vela alcista
-        
         # Verificar que la última vela cierra arriba del máximo de la vela anterior
         if vela3['close'] >= vela2['high']:
             return crear_señal('LONG_1VELA', par, intervalo, vela3, df, len(df)-1, RATIO_1VELA)
@@ -85,9 +84,9 @@ def buscar_patron_short(df, par, intervalo):
         return None
     
     # Tomar las últimas 3 velas
-    vela1 = df.iloc[-3]  # Penúltima
-    vela2 = df.iloc[-2]  # Antepenúltima
-    vela3 = df.iloc[-1]  # Última
+    vela1 = df.iloc[2]  # Penúltima
+    vela2 = df.iloc[1]  # Antepenúltima
+    vela3 = df.iloc[0]  # Última
     
     # Patrón 1: Última vela bajista y 2 anteriores alcistas
     if (vela1['close'] > vela1['open'] and  # Primera vela alcista
@@ -109,21 +108,43 @@ def buscar_patron_short(df, par, intervalo):
     return None
 
 
-
 def crear_señal(tipo, par, intervalo, vela_entrada, df, idx, ratio, es_long=True):
     """Crea señal con todos los parámetros"""
     entrada = vela_entrada['close']
     
     # Calcular SL
     if es_long:
-        sl_precio = df.iloc[:idx]['low'].min()
+        sl_precio = min(df.iloc[0]['low'],df.iloc[1]['low'],df.iloc[2]['low'])
     else:
-        sl_precio = df.iloc[:idx]['high'].max()
+        sl_precio = max(df.iloc[0]['low'],df.iloc[1]['low'],df.iloc[2]['high'])
+        
     
-    # Ajustar SL por pips máximos
+    # ============ MODIFICACIÓN: AJUSTE SL PARA FOREX ============
+    # Verificar si es un par Forex
+    es_forex = any(major in par.upper() for major in [
+        "EUR", "USD", "GBP", "JPY", "CHF", "AUD", "CAD", "NZD"
+    ]) and any(divisa in par.upper() for divisa in [
+        "EUR", "USD", "GBP", "JPY", "CHF", "AUD", "CAD", "NZD"
+    ])
+    
+    # Aplicar restricción de máximo 0.00100 para pares Forex
+    if es_forex:
+        diferencia = abs(entrada - sl_precio)
+        
+        # Si la diferencia es mayor a 0.00100, ajustar el SL
+        if diferencia > 0.00100:
+            if es_long:
+                sl_precio = entrada - 0.00100
+            else:
+                sl_precio = entrada + 0.00100
+            
+            print(f"⚠️  SL ajustado para {par} (Forex): Diferencia reducida a 0.00100")
+    # ============ FIN DE MODIFICACIÓN ============
+    
+    # Ajustar SL por pips máximos (configuración general)
     pips = calcular_pips(par, entrada, sl_precio)
     if pips > MAX_PIPS_SL:
-        ajuste = MAX_PIPS_SL / (100 if "JPY" in par else 10000)
+        ajuste = MAX_PIPS_SL / 100000
         if es_long:
             sl_precio = entrada - ajuste
         else:
@@ -136,6 +157,10 @@ def crear_señal(tipo, par, intervalo, vela_entrada, df, idx, ratio, es_long=Tru
         tp = entrada + (riesgo * ratio)
     else:
         tp = entrada - (riesgo * ratio)
+    
+    # Mostrar información de ajuste si fue necesario
+    if es_forex and abs(entrada - sl_precio) == 0.00100:
+        print(f"   📊 {par}: SL limitado a 0.00100 de diferencia ({abs(entrada - sl_precio):.5f})")
     
     return {
         'par': par,
