@@ -8,6 +8,9 @@ from dotenv import load_dotenv
 # Cargar variables de entorno
 load_dotenv()
 
+TOKEN = "8308676973:AAF8Wh8BFhKzVlNlALd1UBb995ViE5JvVMQ"  # El token que te dio @BotFather
+CHANNEL = "@trades_liranza"  # Ejemplo: @micanal o -1001234567890
+
 # Telegram (configura en .env o aquí)
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
 TELEGRAM_CHANNEL = os.getenv("TELEGRAM_CHANNEL", "")
