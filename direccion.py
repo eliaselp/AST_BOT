@@ -3,18 +3,18 @@ MÓDULO DE DIRECCIÓN (1H) - VENTANA DESLIZANTE
 """
 import time
 from datetime import datetime
-from datos import obtener_velas
+from data_metatrader5 import obtener_velas_mt5
 from config import direccion_global, PARES, actualizar_direccion_global
 from notificacion import notificar_direccion
 
-def verificar_direccion_1h():
+def verificar_direccion(temporalidad):
     """Verifica dirección cada 1 hora con ventana deslizante de 3 velas"""
-    print(f"\n[{datetime.now().strftime('%H:%M:%S')}] 🔍 Revisando dirección 1H (Ventana: 3 velas)")
+    print(f"\n[{datetime.now().strftime('%H:%M:%S')}] 🔍 Revisando dirección {temporalidad} (Ventana: 3 velas)")
     
     for par in PARES:
         try:
             # Obtener más datos para asegurar ventana deslizante
-            data = obtener_velas(par, '1hour', 50)  # Más datos para analizar
+            data = obtener_velas_mt5(par,temporalidad, 50)  # Más datos para analizar
             df = data[0]
             
             if df is None or len(df) < 3:
