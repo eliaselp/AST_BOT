@@ -9,7 +9,7 @@ from config import (
     TELEGRAM_TOKEN, TELEGRAM_CHANNEL, temporalidad_direccion, 
     temporalidad_precision, CUENTA_PRINCIPAL, CUENTAS_SECUNDARIAS,
     PORCENTAJE_RIESGO, MAX_OPERACIONES_SIMULTANEAS, MODO_OPERACION,
-    PARES
+    PARES, hora_inicio, hora_fin
 )
 from direccion import verificar_direccion
 from precision import buscar_entradas
@@ -18,10 +18,13 @@ from data_metatrader5 import (
     conectar_mt5, obtener_estado_cuenta,
     abrir_operacion_mercado, contar_operaciones_abiertas
 )
-
+import pytz
 
 # Lista de todas las cuentas a operar
-TODAS_CUENTAS = [CUENTA_PRINCIPAL] + CUENTAS_SECUNDARIAS
+if CUENTA_PRINCIPAL:
+    TODAS_CUENTAS = [CUENTA_PRINCIPAL] + CUENTAS_SECUNDARIAS
+else:
+    TODAS_CUENTAS = CUENTAS_SECUNDARIAS
 
 # Lock para evitar ejecuciones simultáneas
 ejecucion_lock = threading.Lock()
@@ -43,18 +46,19 @@ def inicializar():
     print(f"Temporalidad precisión: {temporalidad_precision}")
     print(f"Riesgo por operación: {PORCENTAJE_RIESGO}%")
     print(f"Máx. operaciones por cuenta: {MAX_OPERACIONES_SIMULTANEAS}")
-    
-    conectar_mt5(servidor=CUENTA_PRINCIPAL['servidor'],numero_cuenta=CUENTA_PRINCIPAL['numero_cuenta'],contraseña=CUENTA_PRINCIPAL['contraseña'])
-    print("\n📋 Cuentas configuradas:")
-    for i, cuenta in enumerate(TODAS_CUENTAS, 1):
-        nombre = cuenta.get('nombre', f"Cuenta {i}")
-        servidor = cuenta['servidor']
-        num_cuenta = cuenta['numero_cuenta']
-        balance = cuenta.get('balance', 'No especificado')
-        print(f"  {i}. {nombre}")
-        print(f"     {num_cuenta}@{servidor}")
-        print(f"     Balance: ${balance if isinstance(balance, (int, float)) else 'N/A'}")
-    
+    if CUENTA_PRINCIPAL:
+        conectar_mt5(servidor=CUENTA_PRINCIPAL['servidor'],numero_cuenta=CUENTA_PRINCIPAL['numero_cuenta'],contraseña=CUENTA_PRINCIPAL['contraseña'])
+    if TODAS_CUENTAS:
+        print("\n📋 Cuentas configuradas:")
+        for i, cuenta in enumerate(TODAS_CUENTAS, 1):
+            nombre = cuenta.get('nombre', f"Cuenta {i}")
+            servidor = cuenta['servidor']
+            num_cuenta = cuenta['numero_cuenta']
+            balance = cuenta.get('balance', 'No especificado')
+            print(f"  {i}. {nombre}")
+            print(f"     {num_cuenta}@{servidor}")
+            print(f"     Balance: ${balance if isinstance(balance, (int, float)) else 'N/A'}")
+        
     if TELEGRAM_TOKEN and TELEGRAM_CHANNEL:
         enviar_mensaje(f"🤖 Bot iniciado\n⏰ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
@@ -176,7 +180,9 @@ def ejecutar_tareas_segun_hora():
             print(f"[{ahora.strftime('%H:%M:%S')}] ✅ Búsqueda {temporalidad_precision} completada")
             
             # Si hay señales, ejecutarlas en todas las cuentas
-            if señales and MODO_OPERACION == 'REAL':
+            ny_tz = pytz.timezone('America/New_York')
+            hora_ny = datetime.now(ny_tz).hour
+            if señales and MODO_OPERACION == 'REAL' and hora_inicio <= hora_ny < hora_fin:
                 print(f"\n[{ahora.strftime('%H:%M:%S')}] 🚀 Ejecutando señales encontradas...")
                 resultados = ejecutar_señales_en_cuentas(señales)
                 
@@ -220,7 +226,9 @@ def ejecutar_primera_verificacion():
         señales = buscar_entradas(intervalo=temporalidad_precision)
         
         # Ejecutar señales si existen
-        if señales:
+        ny_tz = pytz.timezone('America/New_York')
+        hora_ny = datetime.now(ny_tz).hour
+        if señales and MODO_OPERACION == 'REAL' and hora_inicio <= hora_ny < hora_fin:
             print(f"\n[{ahora.strftime('%H:%M:%S')}] 🚀 Ejecutando señales de primera verificación...")
             resultados = ejecutar_señales_en_cuentas(señales)
         else:

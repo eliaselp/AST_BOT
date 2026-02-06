@@ -12,6 +12,7 @@ load_dotenv()
 TELEGRAM_TOKEN = "8308676973:AAF8Wh8BFhKzVlNlALd1UBb995ViE5JvVMQ"
 TELEGRAM_CHANNEL = "@trades_liranza"
 
+NOMBRE_BOT = 'ABRAHAM SCALPER 1H + 5min.\n'
 
 # Cuenta principal
 CUENTA_PRINCIPAL = {
@@ -24,20 +25,20 @@ CUENTA_PRINCIPAL = {
 
 # Cuentas secundarias (lista)
 CUENTAS_SECUNDARIAS = [
-    {
-        'nombre': 'Elias_100000',
-        'servidor': 'MetaQuotes-Demo',
-        'numero_cuenta': 102350889,
-        'contraseña': 'EpIy@b2e',
-        'balance': 100000
-    },
-    {
-        'nombre': 'Elias_50000',
-        'servidor': 'MetaQuotes-Demo',
-        'numero_cuenta': 5045899250,
-        'contraseña': '*b6jGuNb',
-        'balance': 50000
-    },
+    #{
+    #    'nombre': 'Elias_100000',
+    #    'servidor': 'MetaQuotes-Demo',
+    #    'numero_cuenta': 102350889,
+    #    'contraseña': 'EpIy@b2e',
+    #    'balance': 100000
+    #},
+    #{
+    #    'nombre': 'Elias_50000',
+    #    'servidor': 'MetaQuotes-Demo',
+    #    'numero_cuenta': 5045899250,
+    #    'contraseña': '*b6jGuNb',
+    #    'balance': 50000
+    #},
 ]
 
 
@@ -46,8 +47,10 @@ PORCENTAJE_RIESGO = 1.0  # 1% del balance por operación
 MAX_OPERACIONES_SIMULTANEAS = 1  # Máximo de operaciones por cuenta
 
 # Modo de operación
-MODO_OPERACION = "REAL"  # "ANALISIS" o "REAL"
-
+MODO_OPERACION = "ANALISIS"  # "ANALISIS" o "REAL"
+if MODO_OPERACION == 'ANALISIS':
+    CUENTA_PRINCIPAL=None
+    CUENTAS_SECUNDARIAS = []
 # Pares a operar
 PARES = ["EURUSD"] 
 
@@ -58,8 +61,12 @@ RATIO_1VELA = 2
 
 # Variable global de dirección
 direccion_global = {par: None for par in PARES}
-temporalidad_direccion = '15min'
+temporalidad_direccion = '1hour'
 temporalidad_precision = '5min'
+
+
+hora_inicio = 0
+hora_fin = 24
 '''
 ["1min", "3min", "5min", "15min", "30min", "1hour", "2hour", "4hour", "6hour", "12hour" , "1day", "3day", "1week"]
 '''

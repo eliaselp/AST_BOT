@@ -4,7 +4,7 @@ MÓDULO DE NOTIFICACIONES SIMPLE
 import requests
 import time
 from datetime import datetime
-from config import TELEGRAM_TOKEN, TELEGRAM_CHANNEL
+from config import TELEGRAM_TOKEN, TELEGRAM_CHANNEL, NOMBRE_BOT
 
 def enviar_mensaje(texto):
     """Envía mensaje simple a Telegram"""
@@ -15,7 +15,7 @@ def enviar_mensaje(texto):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     datos = {
         "chat_id": TELEGRAM_CHANNEL,
-        "text": texto,
+        "text": NOMBRE_BOT + texto,
         "parse_mode": "HTML"
     }
     
@@ -23,7 +23,9 @@ def enviar_mensaje(texto):
         respuesta = requests.post(url, json=datos, timeout=10)
         if respuesta.status_code == 200:
             return True
-    except:
+        print(respuesta)
+    except Exception as e:
+        print(e)
         pass
     return False
 
@@ -51,3 +53,10 @@ def notificar_entrada(señal):
 • Ratio: 1:{señal['ratio']}
 """
     enviar_mensaje(mensaje)
+    
+    
+    
+    
+#enviar_mensaje("ESTO ES UN MENSAJE DE PRUEBA DEL NUEVO BOT")
+
+
