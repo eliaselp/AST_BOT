@@ -167,11 +167,11 @@ def ejecutar_tareas_segun_hora():
         
         
         acceso_precision = False
-        if acceso_precision == "1hour" and minuto_actual == 0:
+        if temporalidad_precision == "1hour" and minuto_actual == 0:
             acceso_precision = True
-        elif acceso_precision == "15min" and minuto_actual % 15 == 0:
+        elif temporalidad_precision == "15min" and minuto_actual % 15 == 0:
             acceso_precision = True
-        elif acceso_precision == "5min" and minuto_actual % 5 == 0:
+        elif temporalidad_precision == "5min" and minuto_actual % 5 == 0:
             acceso_precision = True
         
         if acceso_precision:
