@@ -256,8 +256,8 @@ def main():
         while True:
             ahora = datetime.now()
             
-            # Verificar si ha pasado 1 minuto desde la última ejecución
-            if (ahora - ultima_verificacion).seconds >= 60:
+            # Verificar si el minuto actual es diferente al de la última verificación
+            if ahora.minute != ultima_verificacion.minute:
                 ultima_verificacion = ahora
                 ejecutar_tareas_segun_hora()
             
