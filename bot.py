@@ -5,6 +5,7 @@ BOT PRINCIPAL - MODO CONTINUO
 import time
 import threading
 from datetime import datetime
+from tiempo import obtener_hora_actual, convertir_a_hora_ny
 from config import (
     TELEGRAM_TOKEN, TELEGRAM_CHANNEL, temporalidad_direccion, 
     temporalidad_precision, CUENTA_PRINCIPAL, CUENTAS_SECUNDARIAS,
@@ -139,10 +140,9 @@ def ejecutar_señales_en_cuentas(señales):
     return resultados
 
 
-def ejecutar_tareas_segun_hora():
+def ejecutar_tareas_segun_hora(ahora):
     """Ejecuta las tareas correspondientes según la hora actual"""
     with ejecucion_lock:
-        ahora = datetime.now()
         minuto_actual = ahora.minute
         hora_actual = ahora.hour
         
@@ -179,9 +179,11 @@ def ejecutar_tareas_segun_hora():
             señales = buscar_entradas(intervalo=temporalidad_precision)
             print(f"[{ahora.strftime('%H:%M:%S')}] ✅ Búsqueda {temporalidad_precision} completada")
             
+            
             # Si hay señales, ejecutarlas en todas las cuentas
-            ny_tz = pytz.timezone('America/New_York')
-            hora_ny = datetime.now(ny_tz).hour
+            #ny_tz = pytz.timezone('America/New_York')
+            #hora_ny = datetime.now(ny_tz).hour
+            hora_ny = convertir_a_hora_ny(obtener_hora_actual()).hour
             if señales and MODO_OPERACION == 'REAL' and hora_inicio <= hora_ny < hora_fin:
                 print(f"\n[{ahora.strftime('%H:%M:%S')}] 🚀 Ejecutando señales encontradas...")
                 resultados = ejecutar_señales_en_cuentas(señales)
@@ -226,8 +228,9 @@ def ejecutar_primera_verificacion():
         señales = buscar_entradas(intervalo=temporalidad_precision)
         
         # Ejecutar señales si existen
-        ny_tz = pytz.timezone('America/New_York')
-        hora_ny = datetime.now(ny_tz).hour
+        #ny_tz = pytz.timezone('America/New_York')
+        #hora_ny = datetime.now(ny_tz).hour
+        hora_ny = convertir_a_hora_ny(obtener_hora_actual()).hour
         if señales and MODO_OPERACION == 'REAL' and hora_inicio <= hora_ny < hora_fin:
             print(f"\n[{ahora.strftime('%H:%M:%S')}] 🚀 Ejecutando señales de primera verificación...")
             resultados = ejecutar_señales_en_cuentas(señales)
@@ -250,16 +253,16 @@ def main():
     print("\n🔄 Entrando en modo continuo...")
     print("🛑 Presiona Ctrl+C para detener\n")
     
-    ultima_verificacion = datetime.now()
+    ultima_verificacion = convertir_a_hora_ny(obtener_hora_actual())
     
     try:
         while True:
-            ahora = datetime.now()
-            
+            #ahora = datetime.now()
+            ahora = convertir_a_hora_ny(obtener_hora_actual())
             # Verificar si el minuto actual es diferente al de la última verificación
             if ahora.minute != ultima_verificacion.minute:
                 ultima_verificacion = ahora
-                ejecutar_tareas_segun_hora()
+                ejecutar_tareas_segun_hora(ahora)
             
             # Mostrar estado
             segundos_restantes = 60 - (ahora - ultima_verificacion).seconds
