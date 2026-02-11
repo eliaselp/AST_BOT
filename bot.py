@@ -10,7 +10,7 @@ from config import (
     TELEGRAM_TOKEN, TELEGRAM_CHANNEL, temporalidad_direccion, 
     temporalidad_precision, CUENTA_PRINCIPAL, CUENTAS_SECUNDARIAS,
     PORCENTAJE_RIESGO, MAX_OPERACIONES_SIMULTANEAS, MODO_OPERACION,
-    PARES, hora_inicio, hora_fin
+    PARES,MAX_OPERACIONES_DIARIAS, hora_inicio, hora_fin
 )
 from direccion import verificar_direccion
 from precision import buscar_entradas
@@ -34,6 +34,8 @@ ejecucion_lock = threading.Lock()
 señales_detectadas = {}
 ULTIMA_SEÑAL_ID = None
 
+CANT_OPERACIONES = 0
+ULTIMO_DIA = 0
 
 def inicializar():
     """Inicializa el bot"""
@@ -183,11 +185,17 @@ def ejecutar_tareas_segun_hora(ahora):
             # Si hay señales, ejecutarlas en todas las cuentas
             #ny_tz = pytz.timezone('America/New_York')
             #hora_ny = datetime.now(ny_tz).hour
-            hora_ny = convertir_a_hora_ny(obtener_hora_actual()).hour
-            if señales and MODO_OPERACION == 'REAL' and hora_inicio <= hora_ny < hora_fin:
+            
+            date = convertir_a_hora_ny(obtener_hora_actual())
+            if ULTIMO_DIA != date.day:
+                ULTIMO_DIA = date.day
+                CANT_OPERACIONES = 0
+                
+            hora_ny = date.hour
+            if señales and MODO_OPERACION == 'REAL' and hora_inicio <= hora_ny < hora_fin and CANT_OPERACIONES < MAX_OPERACIONES_DIARIAS:
                 print(f"\n[{ahora.strftime('%H:%M:%S')}] 🚀 Ejecutando señales encontradas...")
                 resultados = ejecutar_señales_en_cuentas(señales)
-                
+                CANT_OPERACIONES += 1
                 # Resumen de resultados
                 print(f"\n[{ahora.strftime('%H:%M:%S')}] 📊 Resumen de ejecución:")
                 for par, cuentas in resultados.items():
@@ -201,6 +209,7 @@ def ejecutar_tareas_segun_hora(ahora):
                                 print(f"     {cuenta}: ✅ REAL (Ticket: {ticket})")
                         else:
                             print(f"     {cuenta}: ❌ FALLÓ")
+                
             else:
                 print(f"\n[{ahora.strftime('%H:%M:%S')}] ⚠️  No se encontraron señales válidas")
         
@@ -231,9 +240,10 @@ def ejecutar_primera_verificacion():
         #ny_tz = pytz.timezone('America/New_York')
         #hora_ny = datetime.now(ny_tz).hour
         hora_ny = convertir_a_hora_ny(obtener_hora_actual()).hour
-        if señales and MODO_OPERACION == 'REAL' and hora_inicio <= hora_ny < hora_fin:
+        if señales and MODO_OPERACION == 'REAL' and hora_inicio <= hora_ny < hora_fin and CANT_OPERACIONES < MAX_OPERACIONES_DIARIAS:
             print(f"\n[{ahora.strftime('%H:%M:%S')}] 🚀 Ejecutando señales de primera verificación...")
             resultados = ejecutar_señales_en_cuentas(señales)
+            CANT_OPERACIONES += 1
         else:
             print(f"\n[{ahora.strftime('%H:%M:%S')}] ⚠️  No se encontraron señales en primera verificación")
         
