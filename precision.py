@@ -108,7 +108,7 @@ def crear_señal(tipo, par, intervalo, vela_entrada, df, idx, ratio, es_long=Tru
     if es_long:
         sl_precio = min(df.iloc[0]['low'],df.iloc[1]['low'],df.iloc[2]['low'])
     else:
-        sl_precio = max(df.iloc[0]['low'],df.iloc[1]['low'],df.iloc[2]['high'])
+        sl_precio = max(df.iloc[0]['high'],df.iloc[1]['high'],df.iloc[2]['high'])
         
     
     # ============ MODIFICACIÓN: AJUSTE SL PARA FOREX ============
