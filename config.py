@@ -45,12 +45,10 @@ CUENTAS_SECUNDARIAS = [
 # Configuración de trading
 PORCENTAJE_RIESGO = 1.0  # 1% del balance por operación
 MAX_OPERACIONES_SIMULTANEAS = 1  # Máximo de operaciones por cuenta
-
+MAX_OPERACIONES_DIARIAS = 1
 # Modo de operación
 MODO_OPERACION = "ANALISIS"  # "ANALISIS" o "REAL"
-if MODO_OPERACION == 'ANALISIS':
-    CUENTA_PRINCIPAL=None
-    CUENTAS_SECUNDARIAS = []
+
 # Pares a operar
 PARES = ["EURUSD"] 
 
