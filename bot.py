@@ -144,6 +144,7 @@ def ejecutar_señales_en_cuentas(señales):
 
 def ejecutar_tareas_segun_hora(ahora):
     """Ejecuta las tareas correspondientes según la hora actual"""
+    global ULTIMO_DIA, CANT_OPERACIONES
     with ejecucion_lock:
         minuto_actual = ahora.minute
         hora_actual = ahora.hour
@@ -226,6 +227,7 @@ def ejecutar_tareas_segun_hora(ahora):
 
 def ejecutar_primera_verificacion():
     """Ejecuta la primera verificación completa"""
+    global CANT_OPERACIONES, ULTIMO_DIA
     with ejecucion_lock:
         ahora = datetime.now()
         print(f"\n[{ahora.strftime('%H:%M:%S')}] 🚀 Ejecutando primera verificación completa...")
