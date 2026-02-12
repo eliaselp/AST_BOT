@@ -4,7 +4,7 @@ MÓDULO DE DIRECCIÓN (1H) - VENTANA DESLIZANTE
 import time
 from datetime import datetime
 from data_metatrader5 import obtener_velas_mt5
-from config import direccion_global, PARES, actualizar_direccion_global
+from config import direccion_global, PARES, actualizar_direccion_global, CUENTA_PRINCIPAL
 from notificacion import notificar_direccion
 
 def verificar_direccion(temporalidad):
@@ -14,7 +14,7 @@ def verificar_direccion(temporalidad):
     for par in PARES:
         try:
             # Obtener más datos para asegurar ventana deslizante
-            data = obtener_velas_mt5(par,temporalidad, 50)  # Más datos para analizar
+            data = obtener_velas_mt5(par,temporalidad, 50, CUENTA_PRINCIPAL['numero_cuenta'], CUENTA_PRINCIPAL['servidor'], CUENTA_PRINCIPAL['contraseña'])  # Más datos para analizar
             df = data[0]
             
             if df is None or len(df) < 3:

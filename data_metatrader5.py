@@ -36,8 +36,16 @@ def obtener_estado_cuenta():
         'beneficio': cuenta.profit
     }
 
-def obtener_velas_mt5(par, intervalo, barras, incluir_precio_actual=False):
+def obtener_velas_mt5(par, intervalo, barras, numero_cuenta, servidor, contraseña, incluir_precio_actual=False):
     """Obtiene velas históricas de MT5"""
+    limpiar_conexiones_mt5()
+    print(f"\n🔗 Conectando a cuenta {numero_cuenta}@{servidor}...")
+    
+    # Conectar a la cuenta específica
+    if not conectar_mt5(servidor, numero_cuenta, contraseña):
+        print(f"❌ Error conectando a cuenta {numero_cuenta}")
+        return None
+    
     intervalos = {
         '1min': mt5.TIMEFRAME_M1,
         '5min': mt5.TIMEFRAME_M5,
@@ -407,34 +415,11 @@ def calcular_pips(simbolo, precio1, precio2):
 
 
 '''
-servidor = 'MetaQuotes-Demo'
-numero_cuenta = 5045818191
-contraseña = 'P-5qXqGy'
+servidor = config.CUENTA_PRINCIPAL['servidor']
+numero_cuenta = config.CUENTA_PRINCIPAL['numero_cuenta']
+contraseña = config.CUENTA_PRINCIPAL['contraseña']
 # Ejecutar operación REAL usando el método de data_metatrader5
-    
-    
-resultado = abrir_operacion_mercado(
-    servidor=servidor,
-    numero_cuenta=numero_cuenta,
-    contraseña=contraseña,
-    simbolo='EURUSD',
-    balance_cuenta=5000,
-    precio_sl=1.17869,
-    precio_tp=1.18840,
-    tipo_operacion='COMPRA',
-    porcentaje_riesgo=1.0,
-)
-
-if resultado:
-    print(f"    Operación exitosa - Ticket {resultado.order}")
-    resultado = {
-        'exito': True,
-        'ticket': resultado.order,
-        'volumen': resultado.volume,
-        'precio_ejecutado': resultado.price
-    }
-    print(resultado)
-else:
-    print(f"    Error ejecutando operación")
-    
+conectar_mt5(servidor,numero_cuenta,contraseña)
+datos = obtener_velas_mt5(par='EURUSD',intervalo='1hour',barras=30,incluir_precio_actual=True)
+print(datos)
 '''

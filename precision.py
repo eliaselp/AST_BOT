@@ -4,7 +4,7 @@ MÓDULO DE PRECISIÓN (15M y 5M)
 import time
 from datetime import datetime
 from data_metatrader5 import obtener_velas_mt5, calcular_pips
-from config import direccion_global, PARES, MAX_PIPS_SL, RATIO_2VELAS, RATIO_1VELA
+from config import direccion_global, PARES, MAX_PIPS_SL, RATIO_2VELAS, RATIO_1VELA, CUENTA_PRINCIPAL
 from notificacion import notificar_entrada
 
 def buscar_entradas(intervalo):
@@ -20,7 +20,7 @@ def buscar_entradas(intervalo):
             
         try:
             # Obtener velas
-            data = obtener_velas_mt5(par, intervalo, 6)
+            data = obtener_velas_mt5(par, intervalo, 6, CUENTA_PRINCIPAL['numero_cuenta'],CUENTA_PRINCIPAL['servidor'], CUENTA_PRINCIPAL['contraseña'])
             df = data[0]
             if df is None or len(df) < 4:
                 continue
