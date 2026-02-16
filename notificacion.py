@@ -54,9 +54,3 @@ def notificar_entrada(señal):
 """
     enviar_mensaje(mensaje)
     
-    
-    
-    
-#enviar_mensaje("ESTO ES UN MENSAJE DE PRUEBA DEL NUEVO BOT")
-
-
