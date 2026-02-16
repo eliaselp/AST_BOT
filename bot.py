@@ -111,7 +111,7 @@ def ejecutar_tareas_segun_hora(ahora):
             for par, cuentas in config.PARES.items():
                 
                 for cuenta in cuentas:
-                    clave_cuenta = f'{cuenta['numero_cuenta']}@{cuenta['servidor']}'
+                    clave_cuenta = f"{cuenta['numero_cuenta']}@{cuenta['servidor']}"
                     if not cuentas_verificadas.get(clave_cuenta):
                         cerrar_operaciones_por_tiempo(cuenta['servidor'],cuenta['numero_cuenta'],cuenta['contraseña'],config.MAX_DURACION_VELAS,config.temporalidad)
                         cuentas_verificadas[clave_cuenta] = True
@@ -154,7 +154,6 @@ def ejecutar_tareas_segun_hora(ahora):
 def main():
     """Función principal"""
     inicializar()
-    input("==============")
     print("\n⏰ Ejecutando en modo continuo (verificación cada minuto)...")
     print("🛑 Presiona Ctrl+C para detener\n")
     
