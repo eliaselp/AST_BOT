@@ -6,7 +6,7 @@ import config
 import tiempo
 import pytz
 from datetime import datetime
-from operaciones_json import gestor
+
 
 
 def conectar_mt5(servidor, numero_cuenta, contraseña):
@@ -301,6 +301,7 @@ def abrir_operacion_mercado(type_filling ,servidor, numero_cuenta, contraseña, 
             
             # Verificar resultado
             if resultado.retcode == mt5.TRADE_RETCODE_DONE:
+        
                 modify_request = {
                     "action": mt5.TRADE_ACTION_SLTP,
                     "position": resultado.order,
@@ -309,22 +310,7 @@ def abrir_operacion_mercado(type_filling ,servidor, numero_cuenta, contraseña, 
                 }
                 mt5.order_send(modify_request)
                 # Operación exitosa
-                # Registrar en JSON
-                datos_op = {
-                    'ticket': resultado.order,
-                    'simbolo': simbolo,
-                    'tipo': tipo_operacion,
-                    'volumen': resultado.volume,
-                    'precio_entrada': resultado.price,
-                    'sl': precio_sl,
-                    'tp': resultado.price + (resultado.price - precio_sl)*rr_ratio if tipo_operacion=="COMPRA" else resultado.price - (precio_sl - resultado.price)*rr_ratio,
-                    'rr_ratio': porcentaje_riesgo,
-                    'estado': 'ABIERTA',
-                    'fecha_apertura': datetime.now().isoformat()
-                }
-                gestor.guardar_operacion(f'{numero_cuenta}_{servidor}', datos_op)
-                print(f"✅ Operación registrada en JSON para cuenta {numero_cuenta}_{servidor}")
-            
+                
                 print(f"\n✅ Operación exitosa en intento #{intento} - Ticket {resultado.order}")
                 print(f"   Ticket: {resultado.order}")
                 print(f"   Volumen ejecutado: {resultado.volume}")
@@ -354,114 +340,6 @@ def abrir_operacion_mercado(type_filling ,servidor, numero_cuenta, contraseña, 
         return None
     
     return resultado
-
-def cerrar_todas_cuenta(type_filling, servidor, numero_cuenta, contraseña):
-    """
-    Cierra SOLO las operaciones de una cuenta específica que están registradas en el JSON
-    (las que fueron abiertas por este bot)
-    """
-    limpiar_conexiones_mt5()
-    print(f"\n🔗 Conectando a cuenta {numero_cuenta}@{servidor}...")
-    
-    # Conectar
-    if not conectar_mt5(servidor, numero_cuenta, contraseña):
-        return False
-    
-    print(f"\n🔍 Buscando operaciones del bot en cuenta {numero_cuenta}...")
-    
-    # Obtener tickets de operaciones ABIERTAS desde el JSON
-    operaciones_json = gestor.obtener_abiertas(f'{numero_cuenta}_{servidor}')
-    
-    if not operaciones_json:
-        print("   No hay operaciones del bot registradas como abiertas en JSON")
-        return True
-    
-    tickets_bot = [op['ticket'] for op in operaciones_json]
-    print(f"   {len(tickets_bot)} operación(es) del bot encontradas en JSON: {tickets_bot}")
-    
-    # Obtener posiciones abiertas actuales en MT5
-    posiciones_mt5 = mt5.positions_get()
-    if not posiciones_mt5:
-        print("   No hay operaciones abiertas en MT5")
-        # Actualizar JSON por si acaso
-        for ticket in tickets_bot:
-            gestor.actualizar_estado(f'{numero_cuenta}_{servidor}', ticket, 'CERRADA')
-        return True
-    
-    # Crear diccionario de posiciones MT5 por ticket para búsqueda rápida
-    posiciones_dict = {pos.ticket: pos for pos in posiciones_mt5}
-    
-    print(f"\n   Cerrando SOLO operaciones del bot...")
-    
-    cerradas = 0
-    no_encontradas = 0
-    errores = 0
-    
-    # Cerrar SOLO los tickets que están en el JSON
-    for ticket in tickets_bot:
-        intentos = 10
-        while intentos > 0:
-            if ticket in posiciones_dict:
-                # La operación existe en MT5, cerrarla
-                pos = posiciones_dict[ticket]
-                print(f"   Cerrando ticket {ticket}...", end="")
-                
-                # Preparar orden de cierre según tipo
-                if pos.type == 0:  # COMPRA
-                    orden = {
-                        "action": mt5.TRADE_ACTION_DEAL,
-                        "symbol": pos.symbol,
-                        "volume": pos.volume,
-                        "type": mt5.ORDER_TYPE_SELL,
-                        "position": ticket,
-                        "price": mt5.symbol_info_tick(pos.symbol).bid,
-                        "deviation": 10,
-                        "magic": 234000,
-                        "comment": "",
-                        "type_time": mt5.ORDER_TIME_GTC,
-                        "type_filling": type_filling,
-                    }
-                else:  # VENTA
-                    orden = {
-                        "action": mt5.TRADE_ACTION_DEAL,
-                        "symbol": pos.symbol,
-                        "volume": pos.volume,
-                        "type": mt5.ORDER_TYPE_BUY,
-                        "position": ticket,
-                        "price": mt5.symbol_info_tick(pos.symbol).ask,
-                        "deviation": 10,
-                        "magic": 234000,
-                        "comment": "",
-                        "type_time": mt5.ORDER_TIME_GTC,
-                        "type_filling": type_filling,
-                    }
-                
-                # Enviar orden de cierre
-                resultado = mt5.order_send(orden)
-                if resultado and resultado.retcode == mt5.TRADE_RETCODE_DONE:
-                    print(" ✅")
-                    gestor.actualizar_estado(f'{numero_cuenta}_{servidor}', ticket, 'CERRADA')
-                    cerradas += 1
-                    intentos = 0
-                else:
-                    codigo_error = resultado.retcode if resultado else "Error"
-                    print(f" ❌ ({codigo_error})")
-                    errores += 1
-                    intentos -= 1
-            
-        else:
-            # La operación está en JSON pero no en MT5 (ya se cerró manualmente)
-            print(f"   Ticket {ticket} no encontrado en MT5 (ya estaba cerrado)")
-            gestor.actualizar_estado(f'{numero_cuenta}_{servidor}', ticket, 'CERRADA')
-            no_encontradas += 1
-    
-    # Mostrar resumen
-    print(f"\n   📊 RESUMEN:")
-    print(f"      - Cerradas exitosamente: {cerradas}")
-    print(f"      - Ya estaban cerradas: {no_encontradas}")
-    print(f"      - Errores: {errores}")
-    
-    return True
 
 
 

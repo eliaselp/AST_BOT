@@ -103,11 +103,11 @@ def ejecutar_tareas_segun_hora(ahora):
             print(f"\n[{ahora.strftime('%H:%M:%S')}] 🔄 Verificando tareas...")
             
             ejecutar = False
-            if config.temporalidad == "1hour" and minuto_actual == 0:
+            if config.temporalidad_operacion == "1hour" and minuto_actual == 0:
                 ejecutar = True
-            elif config.temporalidad == "15min" and minuto_actual % 15 == 0:
+            elif config.temporalidad_operacion == "15min" and minuto_actual % 15 == 0:
                 ejecutar = True
-            elif config.temporalidad == "5min" and minuto_actual % 5 == 0:
+            elif config.temporalidad_operacion == "5min" and minuto_actual % 5 == 0:
                 ejecutar = True
             
             if ejecutar:
