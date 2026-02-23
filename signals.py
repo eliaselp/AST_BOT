@@ -39,9 +39,9 @@ def buscar_entradas_quiebre(par, cuenta,intervalo=None):
             par, 
             intervalo, 
             3,  # Pedimos 3 velas para tener contexto
-            cuenta['numero_cuenta'],
-            cuenta['servidor'], 
-            cuenta['contraseña']
+            cuenta['credenciales']['numero_cuenta'],
+            cuenta['credenciales']['servidor'], 
+            cuenta['credenciales']['contraseña']
         )
         
         if df is None or len(df) < 2:
@@ -56,9 +56,9 @@ def buscar_entradas_quiebre(par, cuenta,intervalo=None):
             par, 
             config.temporalidad_direccion, 
             3,  # Pedimos 3 velas para tener contexto
-            cuenta['numero_cuenta'],
-            cuenta['servidor'], 
-            cuenta['contraseña'],
+            cuenta['credenciales']['numero_cuenta'],
+            cuenta['credenciales']['servidor'], 
+            cuenta['credenciales']['contraseña'],
             incluir_precio_actual=True
         )
         if precio_actual > df.iloc[0]['open']:

@@ -47,10 +47,10 @@ def ejecutar_señales_en_cuentas(señal,CUENTAS):
     
     # Ejecutar en cada cuenta
     for cuenta_config in CUENTAS:
-        nombre_cuenta = cuenta_config.get('nombre', f"Cuenta {cuenta_config['numero_cuenta']}")
-        servidor = cuenta_config['servidor']
-        numero_cuenta = cuenta_config['numero_cuenta']
-        contraseña = cuenta_config['contraseña']
+        nombre_cuenta = cuenta_config.get('nombre', f"Cuenta {cuenta_config['credenciales']['numero_cuenta']}")
+        servidor = cuenta_config['credenciales']['servidor']
+        numero_cuenta = cuenta_config['credenciales']['numero_cuenta']
+        contraseña = cuenta_config['credenciales']['contraseña']
         balance_cuenta = cuenta_config.get('balance', 0)
         
         print(f"\n      🔄 Procesando en {nombre_cuenta}...")
