@@ -67,13 +67,3 @@ def convertir_a_hora_ny(hora_input):
     # Convertir a Nueva York
     return dt.astimezone(tz_ny)
 
-# Uso directo sin necesidad de funciones adicionales
-if __name__ == "__main__":
-    # Ejemplo 1: Hora actual del servidor en NY
-    hora_actual = obtener_hora_actual()
-    hora_ny = convertir_a_hora_ny(hora_actual)
-    print(f"Hora actual NY: {hora_ny.strftime('%Y-%m-%d %H:%M:%S %Z')}")
-    
-    # Ejemplo 2: Convertir string cualquiera
-    ejemplo = convertir_a_hora_ny("2024-01-15 14:30:00")
-    print(f"String a NY: {ejemplo.strftime('%H:%M %Z')}")
