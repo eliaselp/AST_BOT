@@ -8,7 +8,6 @@ import pytz
 from datetime import datetime
 
 
-
 def conectar_mt5(servidor, numero_cuenta, contraseña):
     """Conecta a una cuenta MT5 específica"""
     if not mt5.initialize():
@@ -42,15 +41,19 @@ def obtener_estado_cuenta():
         'beneficio': cuenta.profit
     }
 
+
+
+
+
 def obtener_velas_mt5(par, intervalo, barras, numero_cuenta, servidor, contraseña, incluir_precio_actual=False):
-    """Obtiene velas históricas de MT5"""
+    """Obtiene velas históricas de MT5 incluyendo volumen"""
     limpiar_conexiones_mt5()
     print(f"\n🔗 Conectando a cuenta {numero_cuenta}@{servidor}...")
     
     # Conectar a la cuenta específica
     if not conectar_mt5(servidor, numero_cuenta, contraseña):
         print(f"❌ Error conectando a cuenta {numero_cuenta}")
-        return None
+        return None, None
     
     intervalos = {
         '1min': mt5.TIMEFRAME_M1,
@@ -72,7 +75,12 @@ def obtener_velas_mt5(par, intervalo, barras, numero_cuenta, servidor, contrase�
     df = pd.DataFrame(rates)
     df['time'] = pd.to_datetime(df['time'], unit='s')
     df.set_index('time', inplace=True)
+    
+    # Renombrar columnas al estándar
     df.columns = ['open', 'high', 'low', 'close', 'tick_volume', 'spread', 'real_volume']
+    
+    # Crear columna 'volume' combinando tick_volume y real_volume según disponibilidad
+    df['volume'] = df['real_volume'].where(df['real_volume'] > 0, df['tick_volume'])
     
     tick = mt5.symbol_info_tick(par)
     precio_actual = tick.ask if tick else df['close'].iloc[-1]
@@ -81,8 +89,9 @@ def obtener_velas_mt5(par, intervalo, barras, numero_cuenta, servidor, contrase�
         df = df.iloc[:-1]
     
     df = df.iloc[::-1]
-    return df[['open', 'high', 'low', 'close']], precio_actual
-
+    
+    # Devolver DataFrame con todas las columnas incluyendo 'volume' estandarizada
+    return df, precio_actual
 def calcular_lote_estandar(simbolo, precio_entrada, precio_stop, balance_cuenta, porcentaje_riesgo, apalancamiento):
     """Calcula el tamaño de lote basado en el balance y riesgo"""
     # Riesgo monetario
