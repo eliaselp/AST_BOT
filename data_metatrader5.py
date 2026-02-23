@@ -289,9 +289,6 @@ def abrir_operacion_mercado(type_filling ,servidor, numero_cuenta, contraseña, 
             if execution_mode != mt5.SYMBOL_TRADE_EXECUTION_MARKET:
                 request["price"] = precio_entrada_final
             
-            print("Filling mode:", simbolo_info.filling_mode)
-            print("Execution mode:", simbolo_info.trade_exemode)
-            input('===============')
             print(f"   📊 Enviando orden {tipo_operacion}")
             print(f"   Precio entrada: {precio_entrada_final:.5f}")
             print(f"   SL: {precio_sl:.5f} | TP: {precio_tp:.5f}")
