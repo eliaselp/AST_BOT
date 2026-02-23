@@ -69,7 +69,7 @@ def ejecutar_señales_en_cuentas(señal,CUENTAS):
                 balance_cuenta=balance_cuenta,
                 precio_sl=señal['sl'],
                 tipo_operacion=tipo_operacion,
-                porcentaje_riesgo=config.PORCENTAJE_RIESGO,
+                porcentaje_riesgo=cuenta_config['riesgo'],
                 rr_ratio=config.rr_ratio,
             )
             if resultado:
@@ -115,7 +115,7 @@ def ejecutar_tareas_segun_hora(ahora):
                 señales = []
                 for par, cuentas in config.PARES.items():
                     if len(cuentas) > 0:
-                        señal = signals.buscar_entradas_quiebre(par=par,CUENTA=cuentas[0],intervalo=config.temporalidad_operacion)
+                        señal = signals.buscar_entradas_quiebre(par=par,cuenta=cuentas[0],intervalo=config.temporalidad_operacion)
                         print(f"[{ahora.strftime('%H:%M:%S')}] ✅ Búsqueda {config.temporalidad_operacion} completada")
 
                     if señal:
