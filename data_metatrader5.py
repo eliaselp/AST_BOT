@@ -13,7 +13,6 @@ mt5_lock = threading.Lock()
 def conectar_mt5(servidor, numero_cuenta, contraseña):
     """Conecta a una cuenta MT5 específica"""
     with mt5_lock:
-        # Verificar si ya estamos conectados a la cuenta correcta
         try:
             cuenta_actual = mt5.account_info()
             if cuenta_actual and cuenta_actual.login == numero_cuenta:
@@ -135,10 +134,65 @@ def calcular_lote_estandar(simbolo, precio_entrada, precio_stop, balance_cuenta,
             lotes = round(lotes / volumen_step) * volumen_step
         return round(lotes, 2)
 
+def establecer_sl_tp_con_reintentos(ticket, precio_sl, precio_tp, type_filling, max_reintentos=100):
+    """Establece SL y TP para una operación existente con su propio sistema de reintentos."""
+    with mt5_lock:
+        print(f"   🔄 Intentando establecer SL/TP para ticket {ticket}...")
+        
+        intento = 0
+        while intento < max_reintentos:
+            intento += 1
+            
+            try:
+                posicion = mt5.positions_get(ticket=ticket)
+                if not posicion or len(posicion) == 0:
+                    print(f"   ⚠️ Intento {intento}: La posición {ticket} ya no existe")
+                    return False
+                
+                modify_request = {
+                    "action": mt5.TRADE_ACTION_SLTP,
+                    "position": ticket,
+                    "sl": precio_sl,
+                    "tp": precio_tp,
+                }
+                
+                print(f"   📝 Intento {intento}: Enviando SL/TP - SL: {precio_sl:.5f}, TP: {precio_tp:.5f}")
+                
+                validacion = mt5.order_check(modify_request)
+                if validacion is None:
+                    error = mt5.last_error()
+                    print(f"   ⚠️ Intento {intento}: Validación SL/TP fallida: {error}")
+                    time.sleep(0.1 * intento)
+                    continue
+                
+                resultado = mt5.order_send(modify_request)
+                
+                if resultado and resultado.retcode == mt5.TRADE_RETCODE_DONE:
+                    print(f"   ✅ SL/TP establecidos en intento {intento}")
+                    return True
+                else:
+                    error_msg = obtener_mensaje_error(resultado.retcode) if resultado else "Error desconocido"
+                    print(f"   ⚠️ Intento {intento}: Error estableciendo SL/TP: {error_msg}")
+                    
+                    if resultado and resultado.retcode in [10016, 10015]:
+                        print(f"      ℹ️ Error con los precios SL/TP - Verificar distancias")
+                        time.sleep(0.2)
+                    else:
+                        time.sleep(0.1 * intento)
+                    
+            except Exception as e:
+                print(f"   ⚠️ Excepción en intento SL/TP {intento}: {str(e)}")
+                time.sleep(0.1 * intento)
+                continue
+        
+        print(f"   ❌ No se pudo establecer SL/TP después de {max_reintentos} intentos")
+        return False
+
 def abrir_operacion_mercado(type_filling, servidor, numero_cuenta, contraseña, simbolo, balance_cuenta, precio_sl, tipo_operacion, porcentaje_riesgo=2.0, rr_ratio=1, max_reintentos=1000):
     """
     Conecta a una cuenta y abre una operación calculando volumen automáticamente
     con reintentos hasta que se ejecute o se alcance el máximo.
+    Primero abre la orden y luego intenta poner SL/TP con sus propios reintentos.
     """
     with mt5_lock:
         print(f"\n🔗 Conectando a cuenta {numero_cuenta}@{servidor}...")
@@ -178,49 +232,42 @@ def abrir_operacion_mercado(type_filling, servidor, numero_cuenta, contraseña, 
             print("❌ Tipo de operación no válido. Use 'COMPRA' o 'VENTA'")
             return None
         
-        intento = 0
-        resultado = None
+        intento_apertura = 0
+        resultado_apertura = None
         
-        print(f"\n🔄 Iniciando intentos de apertura (máximo: {max_reintentos})...")
+        print(f"\n🔄 Iniciando intentos de APERTURA (máximo: {max_reintentos})...")
         
-        while intento < max_reintentos:
-            intento += 1
-            print(f"\n📊 Intento #{intento}")
+        while intento_apertura < max_reintentos:
+            intento_apertura += 1
+            print(f"\n📊 Intento de APERTURA #{intento_apertura}")
             
             try:
                 tick = mt5.symbol_info_tick(simbolo)
                 if tick is None:
-                    print(f"❌ Intento {intento}: No se pudo obtener tick para {simbolo}")
+                    print(f"❌ Intento {intento_apertura}: No se pudo obtener tick para {simbolo}")
                     time.sleep(0.1)
                     continue
                 
                 if tipo_operacion == "COMPRA":
                     precio_actual = tick.ask
                     precio_entrada_final = precio_actual
-                    precio_tp = precio_entrada_final + abs(precio_entrada_final - precio_sl) * rr_ratio
+                    precio_tp_calculado = precio_entrada_final + abs(precio_entrada_final - precio_sl) * rr_ratio
                 else:
                     precio_actual = tick.bid
                     precio_entrada_final = precio_actual
-                    precio_tp = precio_entrada_final - abs(precio_entrada_final - precio_sl) * rr_ratio
+                    precio_tp_calculado = precio_entrada_final - abs(precio_entrada_final - precio_sl) * rr_ratio
                 
                 print(f"   Precio actual: {precio_actual:.5f}")
+                print(f"   TP calculado: {precio_tp_calculado:.5f}")
                 
                 if tipo_operacion == "COMPRA":
                     if precio_sl >= precio_actual:
                         print(f"   ⚠️ SL ({precio_sl}) debe ser < precio actual ({precio_actual})")
                         time.sleep(0.1)
                         continue
-                    if precio_tp <= precio_actual:
-                        print(f"   ⚠️ TP ({precio_tp}) debe ser > precio actual ({precio_actual})")
-                        time.sleep(0.1)
-                        continue
                 else:
                     if precio_sl <= precio_actual:
                         print(f"   ⚠️ SL ({precio_sl}) debe ser > precio actual ({precio_actual})")
-                        time.sleep(0.1)
-                        continue
-                    if precio_tp >= precio_actual:
-                        print(f"   ⚠️ TP ({precio_tp}) debe ser < precio actual ({precio_actual})")
                         time.sleep(0.1)
                         continue
                 
@@ -238,8 +285,6 @@ def abrir_operacion_mercado(type_filling, servidor, numero_cuenta, contraseña, 
                     time.sleep(0.1)
                     continue
                 
-                execution_mode = simbolo_info.trade_exemode
-                
                 request = {
                     "action": mt5.TRADE_ACTION_DEAL,
                     "symbol": simbolo,
@@ -252,12 +297,11 @@ def abrir_operacion_mercado(type_filling, servidor, numero_cuenta, contraseña, 
                     "type_filling": type_filling,
                 }
                 
-                if execution_mode != mt5.SYMBOL_TRADE_EXECUTION_MARKET:
+                if simbolo_info.trade_exemode != mt5.SYMBOL_TRADE_EXECUTION_MARKET:
                     request["price"] = precio_entrada_final
                 
-                print(f"   📊 Enviando orden {tipo_operacion}")
+                print(f"   📊 Enviando orden de APERTURA {tipo_operacion}")
                 print(f"   Precio entrada: {precio_entrada_final:.5f}")
-                print(f"   SL: {precio_sl:.5f} | TP: {precio_tp:.5f}")
                 print(f"   Volumen: {volumen}")
                 print(f"   Riesgo: {porcentaje_riesgo}% (${balance_actual * (porcentaje_riesgo/100):.2f})")
                 
@@ -267,39 +311,45 @@ def abrir_operacion_mercado(type_filling, servidor, numero_cuenta, contraseña, 
                     time.sleep(0.1)
                     continue
                 
-                resultado = mt5.order_send(request)
+                resultado_apertura = mt5.order_send(request)
                 
-                if resultado and resultado.retcode == mt5.TRADE_RETCODE_DONE:
-                    modify_request = {
-                        "action": mt5.TRADE_ACTION_SLTP,
-                        "position": resultado.order,
-                        "sl": precio_sl,
-                        "tp": precio_tp,
-                    }
-                    mt5.order_send(modify_request)
+                if resultado_apertura and resultado_apertura.retcode == mt5.TRADE_RETCODE_DONE:
+                    print(f"\n✅ APERTURA exitosa en intento #{intento_apertura} - Ticket {resultado_apertura.order}")
+                    print(f"   Ticket: {resultado_apertura.order}")
+                    print(f"   Volumen ejecutado: {resultado_apertura.volume}")
+                    print(f"   Precio ejecutado: {resultado_apertura.price:.5f}")
                     
-                    print(f"\n✅ Operación exitosa en intento #{intento} - Ticket {resultado.order}")
-                    print(f"   Ticket: {resultado.order}")
-                    print(f"   Volumen ejecutado: {resultado.volume}")
-                    print(f"   Precio ejecutado: {resultado.price:.5f}")
-                    print(f"   Beneficio potencial: ${(abs(resultado.price - precio_tp) * volumen * 100000):.2f}")
-                    return resultado
+                    print(f"\n🔄 Iniciando intentos para establecer SL/TP...")
+                    
+                    exito_sltp = establecer_sl_tp_con_reintentos(
+                        ticket=resultado_apertura.order,
+                        precio_sl=precio_sl,
+                        precio_tp=precio_tp_calculado,
+                        type_filling=type_filling,
+                        max_reintentos=100
+                    )
+                    
+                    if exito_sltp:
+                        print(f"   ✅ SL/TP establecidos correctamente")
+                        print(f"   Beneficio potencial: ${(abs(resultado_apertura.price - precio_tp_calculado) * volumen * 100000):.2f}")
+                    else:
+                        print(f"   ⚠️ ADVERTENCIA: No se pudo establecer SL/TP después de múltiples intentos")
+                        print(f"   ⚠️ La operación {resultado_apertura.order} está ABIERTA SIN PROTECCIÓN")
+                    
+                    return resultado_apertura
                 else:
-                    error_msg = obtener_mensaje_error(resultado.retcode) if resultado else "Error desconocido"
-                    print(f"   ❌ Intento {intento} fallido: {error_msg}")
+                    error_msg = obtener_mensaje_error(resultado_apertura.retcode) if resultado_apertura else "Error desconocido"
+                    print(f"   ❌ Intento de APERTURA {intento_apertura} fallido: {error_msg}")
                     
-                    pausa = min(0.5 + (intento * 0.05), 5.0)
+                    pausa = min(0.5 + (intento_apertura * 0.05), 5.0)
                     time.sleep(pausa)
                     
             except Exception as e:
-                print(f"   ⚠️ Excepción en intento {intento}: {str(e)}")
+                print(f"   ⚠️ Excepción en intento de apertura {intento_apertura}: {str(e)}")
                 time.sleep(0.5)
                 continue
         
-        if intento >= max_reintentos and resultado is None:
-            print(f"\n❌ Se alcanzó el máximo de {max_reintentos} intentos sin éxito")
-            return None
-        
+        print(f"\n❌ Se alcanzó el máximo de {max_reintentos} intentos de APERTURA sin éxito")
         return None
 
 def obtener_mensaje_error(codigo_error):
@@ -527,34 +577,40 @@ def cerrar_operaciones_por_tiempo(type_filling, servidor, numero_cuenta, contras
             'velas_permitidas': velas_permitidas,
         }
 
-def cerrar_operacion_por_ticket(ticket, type_filling):
+def cerrar_operacion_por_ticket(ticket, type_filling, max_reintentos=100):
     """
     Cierra una operación específica por su ticket con reintentos.
     """
     with mt5_lock:
         try:
-            posicion = mt5.positions_get(ticket=ticket)
-            if not posicion or len(posicion) == 0:
-                print(f"❌ No se encontró la posición con ticket {ticket}")
-                return False
+            print(f"\n   🔄 Intentando cerrar ticket {ticket}...")
             
-            pos = posicion[0]
-            symbol = pos.symbol
-            volume = pos.volume
-            position_type = pos.type
-            
-            max_reintentos = 100
             intento = 0
-            
             while intento < max_reintentos:
                 intento += 1
                 
+                posicion = mt5.positions_get(ticket=ticket)
+                if not posicion or len(posicion) == 0:
+                    print(f"   ✅ Ticket {ticket} ya no está abierto")
+                    return True
+                
+                pos = posicion[0]
+                symbol = pos.symbol
+                volume = pos.volume
+                position_type = pos.type
+                
+                tick = mt5.symbol_info_tick(symbol)
+                if tick is None:
+                    print(f"   ⚠️ Intento {intento}: No se pudo obtener tick")
+                    time.sleep(0.1 * intento)
+                    continue
+                
                 if position_type == mt5.POSITION_TYPE_BUY:
                     order_type = mt5.ORDER_TYPE_SELL
-                    price = mt5.symbol_info_tick(symbol).bid
+                    price = tick.bid
                 else:
                     order_type = mt5.ORDER_TYPE_BUY
-                    price = mt5.symbol_info_tick(symbol).ask
+                    price = tick.ask
                 
                 close_request = {
                     "action": mt5.TRADE_ACTION_DEAL,
@@ -570,17 +626,24 @@ def cerrar_operacion_por_ticket(ticket, type_filling):
                     "type_filling": type_filling,
                 }
                 
+                validacion = mt5.order_check(close_request)
+                if validacion is None:
+                    error = mt5.last_error()
+                    print(f"   ⚠️ Intento {intento}: Validación fallida: {error}")
+                    time.sleep(0.1 * intento)
+                    continue
+                
                 result = mt5.order_send(close_request)
                 
                 if result and result.retcode == mt5.TRADE_RETCODE_DONE:
-                    print(f"   ✅ Operación {ticket} cerrada.")
+                    print(f"   ✅ Ticket {ticket} cerrado en intento {intento}")
                     return True
                 else:
                     error_msg = obtener_mensaje_error(result.retcode) if result else "Error desconocido"
-                    print(f"   ⚠️ Intento {intento}: Error cerrando ticket {ticket}: {error_msg}")
+                    print(f"   ⚠️ Intento {intento}: Error cerrando: {error_msg}")
                     time.sleep(0.1 * intento)
-                    
-            print(f"❌ No se pudo cerrar el ticket {ticket} después de {max_reintentos} intentos")
+            
+            print(f"   ❌ No se pudo cerrar ticket {ticket} después de {max_reintentos} intentos")
             return False
             
         except Exception as e:
