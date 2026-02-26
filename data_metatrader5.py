@@ -8,13 +8,31 @@ import pytz
 from datetime import datetime
 
 
-def conectar_mt5(servidor, numero_cuenta, contraseña):
-    """Conecta a una cuenta MT5 específica"""
-    if not mt5.initialize():
-        print("Error al inicializar MT5:", mt5.last_error())
-        return False
+def conectar_mt5(servidor, numero_cuenta, contraseña, ruta_terminal=None):
+    """
+    Conecta a una cuenta MT5 específica
     
-    autorizado = mt5.login(numero_cuenta, contraseña=contraseña, server=servidor)
+    Args:
+        servidor: Servidor del broker
+        numero_cuenta: Número de cuenta
+        contraseña: Contraseña
+        ruta_terminal: Ruta al terminal64.exe de la instalación específica (opcional)
+                       Ejemplo: 'C:\\Archivos de programa\\MetaTrader 5 IC Markets\\terminal64.exe'
+    """
+    # Inicializar con la ruta específica si se proporciona
+    if ruta_terminal:
+        print(f"📁 Inicializando MT5 desde: {ruta_terminal}")
+        if not mt5.initialize(path=ruta_terminal):
+            print("Error al inicializar MT5 con ruta específica:", mt5.last_error())
+            return False
+    else:
+        # Comportamiento por defecto (última terminal abierta)
+        if not mt5.initialize():
+            print("Error al inicializar MT5:", mt5.last_error())
+            return False
+    
+    # El resto de tu función permanece igual
+    autorizado = mt5.login(numero_cuenta, password=contraseña, server=servidor)
     if not autorizado:
         print("Error de login:", mt5.last_error())
         mt5.shutdown()
