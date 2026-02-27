@@ -128,8 +128,8 @@ bool ConnectToServer()
    
    Print("🔄 Conectando a: ", url);
    
-   // CORREGIDO: ClientConnect solo recibe el puerto como parámetro
-   int ret = ws.ClientConnect(ServerPort);
+   // CORREGIDO: Usar ClientConnect con IP y Puerto
+   int ret = ws.ClientConnect(ServerIP, ServerPort);
    if(ret < 0)
    {
       Print("❌ Error de conexión: ", ws.GetError());
@@ -227,8 +227,8 @@ void ProcessSignal(string jsonMessage)
    
    Print("📊 Señal válida: ", signal.pair, " | ", signal.type, " | SL: ", signal.sl, " | TP: ", signal.tp);
    
-   // CORREGIDO: IsTradeAllowed() no necesita parámetros
-   if(AutoTrade && IsTradeAllowed())
+   // CORREGIDO: En MQL5 usamos TerminalInfoInteger(TERMINAL_TRADE_ALLOWED) en lugar de IsTradeAllowed()
+   if(AutoTrade && TerminalInfoInteger(TERMINAL_TRADE_ALLOWED))
    {
       ExecuteTradeWithRetry(signal);
    }
@@ -466,7 +466,7 @@ ulong OpenOrderWithRetry(string symbol, bool isBuy, double volume, double expect
          // CORREGIDO: OrderCalcMargin devuelve bool
          if(OrderCalcMargin(request.type, symbol, volume, price, marginRequired))
          {
-            double freeMargin = AccountInfoDouble(ACCOUNT_MARGIN_FREE); // CORREGIDO: Usar ACCOUNT_MARGIN_FREE
+            double freeMargin = AccountInfoDouble(ACCOUNT_MARGIN_FREE);
          
             if(marginRequired > freeMargin * (MaxMarginUse/100.0))
             {
@@ -627,7 +627,7 @@ double CalculateOptimalVolume(string symbol, double entryPrice, double stopLoss,
    
    if(OrderCalcMargin(orderType, symbol, lots, entryPrice, marginRequired))
    {
-      double freeMargin = AccountInfoDouble(ACCOUNT_MARGIN_FREE); // CORREGIDO: Usar ACCOUNT_MARGIN_FREE
+      double freeMargin = AccountInfoDouble(ACCOUNT_MARGIN_FREE);
       
       if(marginRequired > freeMargin * (MaxMarginUse/100.0))
       {
