@@ -15,9 +15,9 @@ input int      FileCheckInterval = 1;           // Intervalo de revisión (segun
 
 //--- Input parameters - GESTIÓN DE RIESGO
 input group "=== GESTIÓN DE RIESGO ==="
-input double   BalanceReferencia = 0;          // 0 = usar balance real
-input double   RiskPercent       = 1.0;        // % de riesgo por operación
-input double   MaxRiskMoney      = 0;          // 0 = sin límite máximo
+input double   BalanceReferencia = 0;          // 0 = usar balance real (BalanceReferencia)
+input double   RiskPercent       = 1.0;        // % de riesgo por operación (RiskPercent)
+input double   MaxRiskMoney      = 0;          // 0 = sin límite máximo (MaxRiskMoney)
 
 //--- Input parameters - EJECUCIÓN
 input group "=== CONFIGURACIÓN DE EJECUCIÓN ==="
@@ -33,9 +33,9 @@ input group "=== VALIDACIONES ==="
 input bool     ValidateSymbol     = false;       // Validar símbolo de la señal
 input double   MinSLPoints        = 0;         // Mínimo SL en puntos
 input double   MinTPPoints        = 0;         // Mínimo TP en puntos
-input double   MaxSpreadPoints    = 0;          // 0 = sin límite
+input double   MaxSpreadPoints    = 0;          // 0 = sin límite (MaxSpreadPoints)
 input bool     CheckFreeMargin    = true;       // Verificar margen libre
-input double   MaxMarginUse       = 80.0;       // % Máx de margen a usar
+input double   MaxMarginUse       = 95.0;       // % Máx de margen a usar
 
 //--- Global variables
 string lastSignalUUID = "";  // Variable global para almacenar el último UUID procesado
@@ -228,7 +228,8 @@ void ProcessSignal(string jsonMessage)
    
    Print("📊 Señal válida: ", signal.pair, " | ", signal.type, " | SL: ", signal.sl, " | TP: ", signal.tp);
    
-   if(AutoTrade && IsTradeAllowed())
+   // CORREGIDO: IsTradeAllowed() no existe en MQL5
+   if(AutoTrade && TerminalInfoInteger(TERMINAL_TRADE_ALLOWED))
    {
       if(ExecuteTradeWithRetry(signal))
       {
@@ -335,10 +336,11 @@ bool ValidateSignal(SignalData &signal, string currentSymbol)
       return false;
    }
    
-   // Validar spread
+   // Validar spread - CORREGIDO: conversión de long a double
    if(MaxSpreadPoints > 0)
    {
-      double spread = SymbolInfoInteger(currentSymbol, SYMBOL_SPREAD);
+      long spreadLong = SymbolInfoInteger(currentSymbol, SYMBOL_SPREAD);
+      double spread = (double)spreadLong;  // Conversión explícita
       if(spread > MaxSpreadPoints)
       {
          Print("⚠️ Señal ignorada - Spread muy alto: ", spread, " puntos (máx ", MaxSpreadPoints, ")");
@@ -480,13 +482,23 @@ ulong OpenOrderWithRetry(string symbol, bool isBuy, double volume, double expect
       // Verificar margen si está activado
       if(CheckFreeMargin)
       {
-         double marginRequired = OrderCalcMargin(request.type, symbol, volume, price);
-         double freeMargin = AccountInfoDouble(ACCOUNT_FREEMARGIN);
+         double marginRequired = 0;
+         // CORREGIDO: OrderCalcMargin necesita 5 parámetros
+         if(!OrderCalcMargin(request.type, symbol, volume, price, marginRequired))
+         {
+            Print("⚠️ Error calculando margen requerido");
+            Sleep(100);
+            continue;
+         }
+         
+         // CORREGIDO: ACCOUNT_FREEMARGIN -> ACCOUNT_MARGIN_FREE
+         double freeMargin = AccountInfoDouble(ACCOUNT_MARGIN_FREE);
          
          if(marginRequired > freeMargin * (MaxMarginUse/100.0))
          {
-            Print("⚠️ Intento ", attempt, ": Margen insuficiente");
-            Sleep(100); // Sleep fijo de 100ms (máximo 1 segundo)
+            Print("⚠️ Intento ", attempt, ": Margen insuficiente. Requerido: ", marginRequired, 
+                  ", Disponible: ", freeMargin * (MaxMarginUse/100.0));
+            Sleep(100);
             continue;
          }
       }
@@ -635,12 +647,18 @@ double CalculateOptimalVolume(string symbol, double entryPrice, double stopLoss,
       lots = MathFloor(lots / volumeStep) * volumeStep;
    }
    
-   // Verificación final de margen
-   double marginRequired = OrderCalcMargin(
-      (entryPrice > stopLoss ? ORDER_TYPE_BUY : ORDER_TYPE_SELL), 
-      symbol, lots, entryPrice);
+   // Verificación final de margen - CORREGIDO
+   ENUM_ORDER_TYPE orderType = (entryPrice > stopLoss) ? ORDER_TYPE_BUY : ORDER_TYPE_SELL;
+   double marginRequired = 0;
    
-   double freeMargin = AccountInfoDouble(ACCOUNT_FREEMARGIN);
+   if(!OrderCalcMargin(orderType, symbol, lots, entryPrice, marginRequired))
+   {
+      Print("⚠️ Error calculando margen requerido para verificación final");
+      return lots; // Retornamos el cálculo sin ajuste de margen
+   }
+   
+   // CORREGIDO: ACCOUNT_FREEMARGIN -> ACCOUNT_MARGIN_FREE
+   double freeMargin = AccountInfoDouble(ACCOUNT_MARGIN_FREE);
    
    if(marginRequired > freeMargin * (MaxMarginUse/100.0))
    {
