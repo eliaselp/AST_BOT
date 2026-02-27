@@ -7,9 +7,28 @@ import threading
 from datetime import datetime
 from tiempo import obtener_hora_actual
 import config
+import asyncio
 import signals as signals
 from notificacion import enviar_mensaje, notificar_entrada
-from data_metatrader5 import abrir_operacion_mercado, cerrar_operaciones_por_tiempo
+import websocket_master_client
+
+
+async def notificar_signal_websocket(señal_trading):
+    """Ejemplo de cómo usar el cliente"""
+    
+    # Crear cliente y conectar
+    cliente = websocket_master_client.WebSocketMaster(
+        room_name=config.room_name,
+        token=config.token,
+        dominio=config.dominio
+    )
+    
+    try:
+        await cliente.connect()
+        await cliente.send(señal_trading)
+        await asyncio.sleep(1)  # Esperar un momento
+    finally:
+        await cliente.disconnect()
 
 
 # Lock para evitar ejecuciones simultáneas
@@ -27,64 +46,6 @@ def inicializar():
     print(f"Riesgo por operación: {config.PORCENTAJE_RIESGO}%")
     if config.TELEGRAM_TOKEN and config.TELEGRAM_CHANNEL:
         enviar_mensaje(f"🤖 Bot iniciado\n⏰ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-
-
-def ejecutar_señales_en_cuentas(señal,CUENTAS):
-    """Ejecuta las señales en todas las cuentas configuradas"""
-    if not señal:
-        print("   ⚠️  No hay señales para ejecutar")
-        return False
-    
-    resultados = {}
-    resultados[señal['par']] = {}
-    print(f"\n   🎯 Procesando señal para {señal['par']}:")
-    print(f"      Tipo: {señal['tipo']}")
-    print(f"      Entrada: {señal['entrada']:.5f}")
-    print(f"      SL: {señal['sl']:.5f}")
-    print(f"      TP: {señal['tp']:.5f}")
-    print(f"      Pips SL: {señal['pips_sl']}")
-    print(f"      Ratio: {señal['ratio']}:1")
-    
-    # Ejecutar en cada cuenta
-    for cuenta_config in CUENTAS:
-        nombre_cuenta = cuenta_config.get('nombre', f"Cuenta {cuenta_config['credenciales']['numero_cuenta']}")
-        servidor = cuenta_config['credenciales']['servidor']
-        numero_cuenta = cuenta_config['credenciales']['numero_cuenta']
-        contraseña = cuenta_config['credenciales']['contraseña']
-        balance_cuenta = cuenta_config.get('balance', 0)
-        
-        print(f"\n      🔄 Procesando en {nombre_cuenta}...")
-        
-        # Determinar tipo de operación
-        tipo_operacion = "COMPRA" if "LONG" in señal['tipo'] else "VENTA"
-        
-        if config.MODO_OPERACION == "REAL":
-            # Ejecutar operación REAL usando el método de data_metatrader5
-            resultado = abrir_operacion_mercado(
-                type_filling=cuenta_config['type_filling'],
-                servidor=servidor,
-                numero_cuenta=numero_cuenta,
-                contraseña=contraseña,
-                simbolo=señal['par'],
-                balance_cuenta=balance_cuenta,
-                precio_sl=señal['sl'],
-                tipo_operacion=tipo_operacion,
-                porcentaje_riesgo=cuenta_config['riesgo'],
-                rr_ratio=config.rr_ratio,
-            )
-            if resultado:
-                print(f"      ✅ {nombre_cuenta}: Operación exitosa - Ticket {resultado.order}")
-                resultados[señal['par']][nombre_cuenta] = {
-                    'exito': True,
-                    'ticket': resultado.order,
-                    'volumen': resultado.volume,
-                    'precio_ejecutado': resultado.price
-                }
-                
-            else:
-                print(f"      ❌ {nombre_cuenta}: Error ejecutando operación")
-                resultados[señal['par']][nombre_cuenta] = {'exito': False}
-    return resultados
 
 
 def ejecutar_tareas_segun_hora(ahora):
@@ -122,21 +83,8 @@ def ejecutar_tareas_segun_hora(ahora):
                         señales.append(señal)
                         if config.MODO_OPERACION == 'REAL':
                             print(f"\n[{ahora.strftime('%H:%M:%S')}] 🚀 Ejecutando señales encontradas...")
-                            resultados = ejecutar_señales_en_cuentas(señal=señal,CUENTAS=cuentas)
+                            asyncio.run(notificar_signal_websocket(señal_trading=señal))
                             
-                            # Resumen de resultados
-                            print(f"\n[{ahora.strftime('%H:%M:%S')}] 📊 Resumen de ejecución:")
-                            for par, cuentas in resultados.items():
-                                print(f"   {par}:")
-                                for cuenta, resultado in cuentas.items():
-                                    if resultado.get('exito'):
-                                        if resultado.get('simulado'):
-                                            print(f"     {cuenta}: ✅ SIMULADO")
-                                        else:
-                                            ticket = resultado.get('ticket', 'N/A')
-                                            print(f"     {cuenta}: ✅ REAL (Ticket: {ticket})")
-                                    else:
-                                        print(f"     {cuenta}: ❌ FALLÓ")
                 if señales:
                     for señal in señales:
                         notificar_entrada(señal=señal)

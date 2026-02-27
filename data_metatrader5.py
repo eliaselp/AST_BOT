@@ -59,13 +59,13 @@ def obtener_estado_cuenta():
         'beneficio': cuenta.profit
     }
 
-def obtener_velas_mt5(par, intervalo, barras, numero_cuenta, servidor, contraseña, incluir_precio_actual=False):
+def obtener_velas_mt5(par, intervalo, barras, numero_cuenta, servidor, contraseña,ruta=None, incluir_precio_actual=False):
     """Obtiene velas históricas de MT5 incluyendo volumen"""
     limpiar_conexiones_mt5()
     print(f"\n🔗 Conectando a cuenta {numero_cuenta}@{servidor}...")
     
     # Conectar a la cuenta específica
-    if not conectar_mt5(servidor, numero_cuenta, contraseña):
+    if not conectar_mt5(servidor, numero_cuenta, contraseña, ruta_terminal=ruta):
         print(f"❌ Error conectando a cuenta {numero_cuenta}")
         return None, None
     
@@ -152,7 +152,7 @@ def calcular_lote_estandar(simbolo, precio_entrada, precio_stop, balance_cuenta,
     return round(lotes, 2)
 
 
-def abrir_operacion_mercado(type_filling, servidor, numero_cuenta, contraseña, simbolo, balance_cuenta, precio_sl, tipo_operacion, porcentaje_riesgo=2.0, rr_ratio=1, max_reintentos=1000):
+def abrir_operacion_mercado(type_filling, servidor, numero_cuenta, contraseña, simbolo, balance_cuenta, precio_sl, tipo_operacion, porcentaje_riesgo=2.0, rr_ratio=1,ruta=None, max_reintentos=1000):
     """
     Conecta a una cuenta y abre una operación calculando volumen automáticamente
     con reintentos hasta que se ejecute o se alcance el máximo.
@@ -160,7 +160,7 @@ def abrir_operacion_mercado(type_filling, servidor, numero_cuenta, contraseña, 
     """
     print(f"\n🔗 Conectando a cuenta {numero_cuenta}@{servidor}...")
     
-    if not conectar_mt5(servidor, numero_cuenta, contraseña):
+    if not conectar_mt5(servidor, numero_cuenta, contraseña, ruta_terminal=ruta):
         print(f"❌ Error conectando a cuenta {numero_cuenta}")
         return None
     
@@ -470,7 +470,7 @@ def calcular_pips(simbolo, precio1, precio2):
 
 
 
-def cerrar_operaciones_por_tiempo(type_filling, servidor, numero_cuenta, contraseña, velas_permitidas, temporalidad):
+def cerrar_operaciones_por_tiempo(type_filling, servidor, numero_cuenta, contraseña, velas_permitidas, temporalidad, ruta=None):
     """
     Cierra operaciones abiertas que superen un tiempo máximo de apertura basado en velas.
     
@@ -515,7 +515,7 @@ def cerrar_operaciones_por_tiempo(type_filling, servidor, numero_cuenta, contras
     limpiar_conexiones_mt5()
     print(f"\n🔗 Conectando a cuenta {numero_cuenta}@{servidor}...")
     
-    if not conectar_mt5(servidor, numero_cuenta, contraseña):
+    if not conectar_mt5(servidor, numero_cuenta, contraseña, ruta_terminal=ruta):
         print(f"❌ Error conectando a cuenta {numero_cuenta}_{servidor}")
         return None
     

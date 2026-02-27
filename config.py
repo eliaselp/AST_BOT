@@ -6,6 +6,9 @@ TELEGRAM_TOKEN = "8308676973:AAF8Wh8BFhKzVlNlALd1UBb995ViE5JvVMQ"
 TELEGRAM_CHANNEL = "@trades_liranza"
 NOMBRE_BOT = "ELIASBOT_1H-15M\n"
 
+room_name="PRIMERA-SALA",
+token="9e273534-4fe6-49b5-9b81-45a75912bf57",
+dominio="216.226.149.70:8000"
 
 temporalidad_operacion = '15min'
 temporalidad_direccion = '4hour'
@@ -29,7 +32,8 @@ PARES = {
             'credenciales': {
                 'numero_cuenta': 80557170,
                 'contraseña': '24jfur$YgO',
-                'servidor': 'OGMInternational-Server'
+                'servidor': 'OGMInternational-Server',
+                
             }
         }
     ]
