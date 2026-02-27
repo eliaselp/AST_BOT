@@ -6,43 +6,43 @@
 #property version   "3.00"
 #property strict
 #property description "EA que recibe señales vía archivo JSON y ejecuta operaciones"
-#property description "con gestión de riesgo y sistema de reintentos"
 
 //--- Input parameters - ARCHIVO
 input group "=== CONFIGURACIÓN DE ARCHIVO ==="
-input string   JsonFilePath     = "C:\\señales\\senal.json";  // Ruta del archivo JSON
-input int      FileCheckInterval = 1;           // Intervalo de revisión (segundos)
+input string   JsonFilePath     = "C:\\señales\\senal.json";
+input int      FileCheckInterval = 1;
 
 //--- Input parameters - GESTIÓN DE RIESGO
 input group "=== GESTIÓN DE RIESGO ==="
-input double   BalanceReferencia = 0;          // 0 = usar balance real (BalanceReferencia)
-input double   RiskPercent       = 1.0;        // % de riesgo por operación (RiskPercent)
-input double   MaxRiskMoney      = 0;          // 0 = sin límite máximo (MaxRiskMoney)
+input double   BalanceReferencia = 0;
+input double   RiskPercent       = 1.0;
+input double   MaxRiskMoney      = 0;
 
 //--- Input parameters - EJECUCIÓN
 input group "=== CONFIGURACIÓN DE EJECUCIÓN ==="
 input bool     AutoTrade         = true;
-input int      MaxOpenAttempts    = 10;        // Máx intentos para abrir
-input int      MaxModifyAttempts  = 10;        // Máx intentos para SL/TP
-input int      Deviation          = 10;         // Desviación permitida
-input ENUM_ORDER_TYPE_FILLING FillingType = ORDER_FILLING_FOK;  // Tipo de filling
-input int      MagicNumber        = 234000;     // Magic number del EA
+input int      MaxOpenAttempts    = 10;
+input int      MaxModifyAttempts  = 10;
+input int      Deviation          = 10;
+input ENUM_ORDER_TYPE_FILLING FillingType = ORDER_FILLING_FOK;
+input int      MagicNumber        = 234000;
 
 //--- Input parameters - VALIDACIONES
 input group "=== VALIDACIONES ==="
-input bool     ValidateSymbol     = false;       // Validar símbolo de la señal
-input double   MinSLPoints        = 0;         // Mínimo SL en puntos
-input double   MinTPPoints        = 0;         // Mínimo TP en puntos
-input double   MaxSpreadPoints    = 0;          // 0 = sin límite (MaxSpreadPoints)
-input bool     CheckFreeMargin    = true;       // Verificar margen libre
-input double   MaxMarginUse       = 95.0;       // % Máx de margen a usar
+input bool     ValidateSymbol     = false;
+input double   MinSLPoints        = 0;
+input double   MinTPPoints        = 0;
+input double   MaxSpreadPoints    = 0;
+input bool     CheckFreeMargin    = true;
+input double   MaxMarginUse       = 95.0;
 
 //--- Global variables
-string lastSignalUUID = "";  // Variable global para almacenar el último UUID procesado
+string lastSignalUUID = "";
 datetime lastFileCheck = 0;
 int totalSignals = 0;
 int totalTrades = 0;
 bool isFirstRun = true;
+datetime lastFileModTime = 0;
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
@@ -50,26 +50,33 @@ bool isFirstRun = true;
 int OnInit()
 {
    Print("╔══════════════════════════════════════════════╗");
-   Print("║   🚀 JSON FILE EA - VERSIÓN 1.0            ║");
+   Print("║   🚀 JSON FILE EA - VERSIÓN 2.0            ║");
    Print("╚══════════════════════════════════════════════╝");
    
-   // Validar parámetros
    if(!ValidateInputs())
       return INIT_PARAMETERS_INCORRECT;
    
-   // Verificar que el archivo existe
-   if(!FileExists(JsonFilePath))
+   // Mostrar información de la ruta
+   Print("📁 Ruta configurada: ", JsonFilePath);
+   Print("📁 Directorio de trabajo: ", TerminalInfoString(TERMINAL_DATA_PATH));
+   Print("📁 Ruta común: ", TerminalInfoString(TERMINAL_COMMONDATA_PATH));
+   
+   // Verificar si el archivo existe
+   if(FileExists(JsonFilePath))
+   {
+      Print("✅ Archivo encontrado: ", JsonFilePath);
+      lastFileModTime = GetFileModTime(JsonFilePath);
+   }
+   else
    {
       Print("⚠️ El archivo no existe: ", JsonFilePath);
-      Print("   Se creará cuando llegue la primera señal");
+      Print("   Verifica que la ruta sea correcta");
+      Print("   Intenta con: ", "\\Files\\senal.json");
    }
    
    Print("📊 Configuración de riesgo:");
    Print("   Balance referencia: ", (BalanceReferencia > 0 ? DoubleToString(BalanceReferencia, 2) : "Balance real"));
    Print("   Riesgo: ", RiskPercent, "%");
-   Print("   Intentos apertura: ", MaxOpenAttempts);
-   Print("   Intentos SL/TP: ", MaxModifyAttempts);
-   Print("   Archivo JSON: ", JsonFilePath);
    
    EventSetTimer(FileCheckInterval);
    return INIT_SUCCEEDED;
@@ -106,12 +113,6 @@ bool ValidateInputs()
       valid = false;
    }
    
-   if(JsonFilePath == "")
-   {
-      Print("❌ La ruta del archivo JSON no puede estar vacía");
-      valid = false;
-   }
-   
    return valid;
 }
 
@@ -124,15 +125,31 @@ void OnDeinit(const int reason)
    Print("📊 Estadísticas finales:");
    Print("   Señales recibidas: ", totalSignals);
    Print("   Operaciones ejecutadas: ", totalTrades);
-   Print("   Último UUID procesado: ", lastSignalUUID);
 }
 
 //+------------------------------------------------------------------+
-//| Timer function - Revisar archivo JSON                           |
+//| Timer function                                                   |
 //+------------------------------------------------------------------+
 void OnTimer()
 {
    CheckJsonFile();
+}
+
+//+------------------------------------------------------------------+
+//| Obtener tiempo de modificación del archivo                      |
+//+------------------------------------------------------------------+
+datetime GetFileModTime(string filePath)
+{
+   datetime modTime = 0;
+   int fileHandle = FileOpen(filePath, FILE_READ|FILE_TXT|FILE_ANSI|FILE_SHARE_READ);
+   
+   if(fileHandle != INVALID_HANDLE)
+   {
+      modTime = FileGetInteger(fileHandle, FILE_MODIFY_DATE);
+      FileClose(fileHandle);
+   }
+   
+   return modTime;
 }
 
 //+------------------------------------------------------------------+
@@ -151,26 +168,39 @@ void CheckJsonFile()
       return;
    }
    
-   // Leer el archivo JSON
-   string jsonContent = ReadJsonFile(JsonFilePath);
-   if(jsonContent == "")
-   {
-      Print("❌ Error al leer el archivo JSON");
-      return;
-   }
+   // Verificar si el archivo ha sido modificado
+   datetime currentModTime = GetFileModTime(JsonFilePath);
    
-   totalSignals++;
-   lastFileCheck = TimeCurrent();
-   ProcessSignal(jsonContent);
+   // Si es la primera vez o el archivo ha cambiado
+   if(currentModTime > lastFileModTime)
+   {
+      Print("📝 Archivo modificado: ", TimeToString(currentModTime));
+      lastFileModTime = currentModTime;
+      
+      // Leer el archivo JSON
+      string jsonContent = ReadJsonFile(JsonFilePath);
+      if(jsonContent != "")
+      {
+         totalSignals++;
+         lastFileCheck = TimeCurrent();
+         ProcessSignal(jsonContent);
+      }
+      else
+      {
+         Print("❌ Error al leer el archivo JSON");
+      }
+   }
 }
 
 //+------------------------------------------------------------------+
-//| Leer archivo JSON                                               |
+//| Leer archivo JSON con mejor manejo de errores                   |
 //+------------------------------------------------------------------+
 string ReadJsonFile(string filePath)
 {
    string content = "";
-   int fileHandle = FileOpen(filePath, FILE_READ|FILE_TXT|FILE_ANSI);
+   
+   // Usar FILE_SHARE_READ para permitir que otros procesos lean el archivo
+   int fileHandle = FileOpen(filePath, FILE_READ|FILE_TXT|FILE_ANSI|FILE_SHARE_READ);
    
    if(fileHandle != INVALID_HANDLE)
    {
@@ -179,8 +209,19 @@ string ReadJsonFile(string filePath)
       if(fileSize > 0)
       {
          content = FileReadString(fileHandle, (int)fileSize);
+         Print("📖 Archivo leído: ", fileSize, " bytes");
       }
+      else
+      {
+         Print("⚠️ Archivo vacío");
+      }
+      
       FileClose(fileHandle);
+   }
+   else
+   {
+      int error = GetLastError();
+      Print("❌ Error al abrir archivo: ", error);
    }
    
    return content;
@@ -200,11 +241,10 @@ bool FileExists(string filePath)
 void ProcessSignal(string jsonMessage)
 {
    Print("📩 Señal #", totalSignals, " recibida");
+   Print("📄 Contenido: ", jsonMessage);
    
-   // Obtener el símbolo del gráfico actual
    string currentSymbol = Symbol();
    
-   // Parsear JSON con manejo de errores
    SignalData signal;
    if(!ParseSignal(jsonMessage, signal))
    {
@@ -212,7 +252,6 @@ void ProcessSignal(string jsonMessage)
       return;
    }
    
-   // Verificar UUID para evitar duplicados
    if(signal.uuid == lastSignalUUID)
    {
       Print("⏭️ Señal duplicada ignorada (UUID: ", signal.uuid, ")");
@@ -220,20 +259,15 @@ void ProcessSignal(string jsonMessage)
    }
    
    Print("📊 Nueva señal con UUID: ", signal.uuid);
-   Print("   Último UUID procesado: ", lastSignalUUID);
+   Print("   Par: ", signal.pair, " | Tipo: ", signal.type);
    
-   // Aplicar todos los filtros y validaciones
    if(!ValidateSignal(signal, currentSymbol))
       return;
    
-   Print("📊 Señal válida: ", signal.pair, " | ", signal.type, " | SL: ", signal.sl, " | TP: ", signal.tp);
-   
-   // CORREGIDO: IsTradeAllowed() no existe en MQL5
    if(AutoTrade && TerminalInfoInteger(TERMINAL_TRADE_ALLOWED))
    {
       if(ExecuteTradeWithRetry(signal))
       {
-         // Actualizar UUID solo si la operación fue exitosa
          lastSignalUUID = signal.uuid;
          Print("✅ UUID actualizado a: ", lastSignalUUID);
       }
@@ -278,13 +312,19 @@ bool ParseSignal(string json, SignalData &signal)
    signal.pair = ExtractJsonValue(json, "par");
    signal.type = ExtractJsonValue(json, "tipo");
    signal.timeframe = ExtractJsonValue(json, "temporalidad");
-   signal.entry = StringToDouble(ExtractJsonValue(json, "entrada"));
-   signal.sl = StringToDouble(ExtractJsonValue(json, "sl"));
-   signal.tp = StringToDouble(ExtractJsonValue(json, "tp"));
-   signal.pips_sl = StringToDouble(ExtractJsonValue(json, "pips_sl"));
-   signal.ratio = StringToDouble(ExtractJsonValue(json, "ratio"));
    
-   // Validar campos obligatorios
+   string entryStr = ExtractJsonValue(json, "entrada");
+   string slStr = ExtractJsonValue(json, "sl");
+   string tpStr = ExtractJsonValue(json, "tp");
+   string pipsSlStr = ExtractJsonValue(json, "pips_sl");
+   string ratioStr = ExtractJsonValue(json, "ratio");
+   
+   signal.entry = StringToDouble(entryStr);
+   signal.sl = StringToDouble(slStr);
+   signal.tp = StringToDouble(tpStr);
+   signal.pips_sl = StringToDouble(pipsSlStr);
+   signal.ratio = StringToDouble(ratioStr);
+   
    if(signal.uuid == "")
    {
       Print("❌ JSON incompleto: falta uuid");
@@ -297,6 +337,12 @@ bool ParseSignal(string json, SignalData &signal)
       return false;
    }
    
+   if(signal.entry == 0 || signal.sl == 0 || signal.tp == 0)
+   {
+      Print("❌ JSON incompleto: valores numéricos inválidos");
+      return false;
+   }
+   
    return true;
 }
 
@@ -305,45 +351,41 @@ bool ParseSignal(string json, SignalData &signal)
 //+------------------------------------------------------------------+
 bool ValidateSignal(SignalData &signal, string currentSymbol)
 {
-   // Validar símbolo
    if(ValidateSymbol && signal.pair != currentSymbol)
    {
       Print("⚠️ Señal para ", signal.pair, " ignorada - Este EA opera en ", currentSymbol);
       return false;
    }
    
-   // Validar que tenemos SL y TP
    if(signal.sl <= 0 || signal.tp <= 0)
    {
       Print("⚠️ Señal ignorada - SL o TP inválidos (<=0)");
       return false;
    }
    
-   // Validar distancias mínimas
    double point = SymbolInfoDouble(currentSymbol, SYMBOL_POINT);
    double slPoints = MathAbs(signal.entry - signal.sl) / point;
    double tpPoints = MathAbs(signal.tp - signal.entry) / point;
    
    if(slPoints < MinSLPoints)
    {
-      Print("⚠️ Señal ignorada - SL demasiado pequeño: ", slPoints, " puntos (mínimo ", MinSLPoints, ")");
+      Print("⚠️ Señal ignorada - SL demasiado pequeño: ", slPoints, " puntos");
       return false;
    }
    
    if(tpPoints < MinTPPoints)
    {
-      Print("⚠️ Señal ignorada - TP demasiado pequeño: ", tpPoints, " puntos (mínimo ", MinTPPoints, ")");
+      Print("⚠️ Señal ignorada - TP demasiado pequeño: ", tpPoints, " puntos");
       return false;
    }
    
-   // Validar spread - CORREGIDO: conversión de long a double
    if(MaxSpreadPoints > 0)
    {
       long spreadLong = SymbolInfoInteger(currentSymbol, SYMBOL_SPREAD);
-      double spread = (double)spreadLong;  // Conversión explícita
+      double spread = (double)spreadLong;
       if(spread > MaxSpreadPoints)
       {
-         Print("⚠️ Señal ignorada - Spread muy alto: ", spread, " puntos (máx ", MaxSpreadPoints, ")");
+         Print("⚠️ Señal ignorada - Spread muy alto: ", spread, " puntos");
          return false;
       }
    }
@@ -375,31 +417,32 @@ string ExtractJsonValue(string json, string key)
       }
       else
       {
-         if(json[end] == ',' || json[end] == '}' || json[end] == ']') break;
+         if(json[end] == ',' || json[end] == '}' || json[end] == ']' || json[end] == ' ')
+            break;
       }
       end++;
    }
    
-   return StringSubstr(json, start, end - start);
+   string result = StringSubstr(json, start, end - start);
+   StringTrimLeft(result);
+   StringTrimRight(result);
+   
+   return result;
 }
 
 //+------------------------------------------------------------------+
-//| Ejecutar orden con sistema de reintentos completo               |
+//| Ejecutar orden con sistema de reintentos                        |
 //+------------------------------------------------------------------+
 bool ExecuteTradeWithRetry(SignalData &signal)
 {
-   // Obtener balance para gestión de riesgo
    double balance = (BalanceReferencia > 0) ? BalanceReferencia : AccountInfoDouble(ACCOUNT_BALANCE);
    
-   // Obtener precios actuales
    double askPrice = SymbolInfoDouble(signal.pair, SYMBOL_ASK);
    double bidPrice = SymbolInfoDouble(signal.pair, SYMBOL_BID);
    
-   // Determinar dirección
    bool isBuy = (signal.type == "COMPRA");
    double entryPrice = isBuy ? askPrice : bidPrice;
    
-   // Validar SL respecto a precio actual
    if(isBuy && signal.sl >= entryPrice)
    {
       Print("⚠️ SL de compra (", signal.sl, ") debe ser menor que precio actual (", entryPrice, ")");
@@ -411,9 +454,7 @@ bool ExecuteTradeWithRetry(SignalData &signal)
       return false;
    }
    
-   // Calcular volumen
-   double volume = CalculateOptimalVolume(signal.pair, entryPrice, signal.sl, 
-                                         RiskPercent, balance);
+   double volume = CalculateOptimalVolume(signal.pair, entryPrice, signal.sl, RiskPercent, balance);
    
    if(volume <= 0)
    {
@@ -421,26 +462,18 @@ bool ExecuteTradeWithRetry(SignalData &signal)
       return false;
    }
    
-   Print("📊 Preparando orden:");
-   Print("   Símbolo: ", signal.pair);
-   Print("   Tipo: ", isBuy ? "COMPRA" : "VENTA");
-   Print("   Volumen: ", volume);
-   Print("   Riesgo: ", RiskPercent, "% (", DoubleToString(balance * RiskPercent/100, 2), ")");
+   Print("📊 Preparando orden: ", signal.pair, " ", isBuy ? "COMPRA" : "VENTA", " ", volume);
    
-   // PASO 1: Abrir orden con reintentos
    ulong ticket = OpenOrderWithRetry(signal.pair, isBuy, volume, entryPrice);
    
    if(ticket > 0)
    {
       totalTrades++;
-      Print("✅ Orden abierta exitosamente. Ticket: ", ticket);
+      Print("✅ Orden abierta. Ticket: ", ticket);
       
-      // PASO 2: Establecer SL/TP con reintentos
       if(!ModifyPositionSLTPWithRetry(ticket, signal.sl, signal.tp))
       {
-         Print("⚠️ CRÍTICO: Operación ", ticket, " abierta SIN PROTECCIÓN");
-         Print("   Por favor, revise manualmente la operación");
-         return true; // La orden se abrió, aunque sin SL/TP
+         Print("⚠️ Operación sin SL/TP: ", ticket);
       }
       return true;
    }
@@ -449,20 +482,16 @@ bool ExecuteTradeWithRetry(SignalData &signal)
 }
 
 //+------------------------------------------------------------------+
-//| Abrir orden con reintentos (sleep máximo 1 segundo)            |
+//| Abrir orden con reintentos                                      |
 //+------------------------------------------------------------------+
 ulong OpenOrderWithRetry(string symbol, bool isBuy, double volume, double expectedPrice)
 {
-   Print("🚀 Iniciando apertura de orden (máx ", MaxOpenAttempts, " intentos)...");
-   
    for(int attempt = 1; attempt <= MaxOpenAttempts; attempt++)
    {
-      // Obtener precios actualizados
       double askPrice = SymbolInfoDouble(symbol, SYMBOL_ASK);
       double bidPrice = SymbolInfoDouble(symbol, SYMBOL_BID);
       double price = isBuy ? askPrice : bidPrice;
       
-      // Preparar request
       MqlTradeRequest request = {};
       MqlTradeResult result = {};
       
@@ -475,91 +504,30 @@ ulong OpenOrderWithRetry(string symbol, bool isBuy, double volume, double expect
       request.type_filling = FillingType;
       request.type_time = ORDER_TIME_GTC;
       request.magic = MagicNumber;
-      request.comment = "";
       
-      Print("📝 Intento #", attempt, " - Precio: ", price);
-      
-      // Verificar margen si está activado
-      if(CheckFreeMargin)
-      {
-         double marginRequired = 0;
-         // CORREGIDO: OrderCalcMargin necesita 5 parámetros
-         if(!OrderCalcMargin(request.type, symbol, volume, price, marginRequired))
-         {
-            Print("⚠️ Error calculando margen requerido");
-            Sleep(100);
-            continue;
-         }
-         
-         // CORREGIDO: ACCOUNT_FREEMARGIN -> ACCOUNT_MARGIN_FREE
-         double freeMargin = AccountInfoDouble(ACCOUNT_MARGIN_FREE);
-         
-         if(marginRequired > freeMargin * (MaxMarginUse/100.0))
-         {
-            Print("⚠️ Intento ", attempt, ": Margen insuficiente. Requerido: ", marginRequired, 
-                  ", Disponible: ", freeMargin * (MaxMarginUse/100.0));
-            Sleep(100);
-            continue;
-         }
-      }
-      
-      // Enviar orden
       if(OrderSend(request, result))
       {
-         Print("✅ Orden ejecutada en intento #", attempt);
-         Print("   Ticket: ", result.order, " | Precio: ", result.price);
          return result.order;
       }
-      else
-      {
-         string errorDesc = GetErrorDescription(result.retcode);
-         Print("❌ Intento ", attempt, " fallido: ", errorDesc, " (", result.retcode, ")");
-         
-         // Sleep fijo de 100ms (no más de 1 segundo)
-         Sleep(100);
-      }
+      
+      Sleep(100);
    }
    
-   Print("❌ No se pudo abrir la orden después de ", MaxOpenAttempts, " intentos");
    return 0;
 }
 
 //+------------------------------------------------------------------+
-//| Modificar SL/TP con reintentos (sleep máximo 500ms)            |
+//| Modificar SL/TP con reintentos                                  |
 //+------------------------------------------------------------------+
 bool ModifyPositionSLTPWithRetry(ulong ticket, double sl, double tp)
 {
-   Print("🔄 Intentando establecer SL/TP para ticket ", ticket, " (máx ", MaxModifyAttempts, " intentos)");
-   
    for(int attempt = 1; attempt <= MaxModifyAttempts; attempt++)
    {
-      // Verificar que la posición aún existe
       if(!PositionSelectByTicket(ticket))
-      {
-         Print("⚠️ Intento ", attempt, ": La posición ", ticket, " ya no existe");
          return false;
-      }
       
-      // Obtener tipo de posición
-      long positionType = PositionGetInteger(POSITION_TYPE);
       string symbol = PositionGetString(POSITION_SYMBOL);
       
-      // Validar SL/TP
-      double currentPrice = (positionType == POSITION_TYPE_BUY) ? 
-                            SymbolInfoDouble(symbol, SYMBOL_BID) : 
-                            SymbolInfoDouble(symbol, SYMBOL_ASK);
-      
-      // Verificar que SL tiene sentido
-      if((positionType == POSITION_TYPE_BUY && sl >= currentPrice) ||
-         (positionType == POSITION_TYPE_SELL && sl <= currentPrice))
-      {
-         Print("⚠️ Intento ", attempt, ": SL inválido para la posición actual");
-         Print("   Precio actual: ", currentPrice, " | SL: ", sl);
-         Sleep(100);
-         continue;
-      }
-      
-      // Preparar request de modificación
       MqlTradeRequest request = {};
       MqlTradeResult result = {};
       
@@ -570,34 +538,21 @@ bool ModifyPositionSLTPWithRetry(ulong ticket, double sl, double tp)
       request.tp = tp;
       request.magic = MagicNumber;
       
-      // Enviar modificación
       if(OrderSend(request, result))
-      {
-         Print("✅ SL/TP establecidos en intento ", attempt);
-         Print("   SL: ", sl, " | TP: ", tp);
          return true;
-      }
-      else
-      {
-         string errorDesc = GetErrorDescription(result.retcode);
-         Print("⚠️ Intento ", attempt, ": Error ", errorDesc, " (", result.retcode, ")");
-         
-         // Sleep fijo de 100ms
-         Sleep(100);
-      }
+      
+      Sleep(100);
    }
    
-   Print("❌ No se pudo establecer SL/TP después de ", MaxModifyAttempts, " intentos");
    return false;
 }
 
 //+------------------------------------------------------------------+
-//| Calcular volumen óptimo con múltiples validaciones              |
+//| Calcular volumen óptimo                                         |
 //+------------------------------------------------------------------+
 double CalculateOptimalVolume(string symbol, double entryPrice, double stopLoss, 
                                double riskPercent, double balance)
 {
-   // Obtener información del símbolo
    double volumeMin = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MIN);
    double volumeMax = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MAX);
    double volumeStep = SymbolInfoDouble(symbol, SYMBOL_VOLUME_STEP);
@@ -605,106 +560,21 @@ double CalculateOptimalVolume(string symbol, double entryPrice, double stopLoss,
    double tickSize = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE);
    double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
    
-   // Si tickValue es 0 (puede pasar en algunos brokers), calcularlo
-   if(tickValue <= 0)
-   {
-      tickValue = 1.0; // Valor por defecto, pero deberías ajustar según tu broker
-      Print("⚠️ Advertencia: tickValue = 0, usando valor por defecto");
-   }
+   if(tickValue <= 0) tickValue = 1.0;
    
-   // Calcular riesgo monetario
    double riskMoney = balance * (riskPercent / 100.0);
    
-   // Aplicar límite máximo si está configurado
    if(MaxRiskMoney > 0 && riskMoney > MaxRiskMoney)
-   {
       riskMoney = MaxRiskMoney;
-      Print("   Aplicando límite máximo de riesgo: $", MaxRiskMoney);
-   }
    
-   // Calcular distancia en puntos
    double slDistance = MathAbs(entryPrice - stopLoss);
-   double slPoints = slDistance / point;
-   
-   if(slPoints < MinSLPoints)
-   {
-      Print("⚠️ SL demasiado pequeño: ", slPoints, " puntos (mínimo ", MinSLPoints, ")");
-      return 0;
-   }
-   
-   // Calcular valor por punto
    double pointValue = tickValue * (slDistance / tickSize);
    
-   // Calcular lotes
    double lots = riskMoney / pointValue;
-   
-   // Ajustar a límites
    lots = MathMax(volumeMin, MathMin(volumeMax, lots));
    
-   // Aplicar step
    if(volumeStep > 0)
-   {
       lots = MathFloor(lots / volumeStep) * volumeStep;
-   }
-   
-   // Verificación final de margen - CORREGIDO
-   ENUM_ORDER_TYPE orderType = (entryPrice > stopLoss) ? ORDER_TYPE_BUY : ORDER_TYPE_SELL;
-   double marginRequired = 0;
-   
-   if(!OrderCalcMargin(orderType, symbol, lots, entryPrice, marginRequired))
-   {
-      Print("⚠️ Error calculando margen requerido para verificación final");
-      return lots; // Retornamos el cálculo sin ajuste de margen
-   }
-   
-   // CORREGIDO: ACCOUNT_FREEMARGIN -> ACCOUNT_MARGIN_FREE
-   double freeMargin = AccountInfoDouble(ACCOUNT_MARGIN_FREE);
-   
-   if(marginRequired > freeMargin * (MaxMarginUse/100.0))
-   {
-      // Reducir lotes proporcionalmente
-      double maxLotsByMargin = (freeMargin * (MaxMarginUse/100.0) * lots) / marginRequired;
-      lots = MathFloor(maxLotsByMargin / volumeStep) * volumeStep;
-      
-      Print("   Margen limitado: ajustando a ", lots);
-   }
    
    return NormalizeDouble(lots, 2);
-}
-
-//+------------------------------------------------------------------+
-//| Obtener descripción del error                                   |
-//+------------------------------------------------------------------+
-string GetErrorDescription(int errorCode)
-{
-   switch(errorCode)
-   {
-      case 0:           return "OK";
-      case 10004:       return "Requote";
-      case 10006:       return "Request rejected";
-      case 10007:       return "Request canceled by trader";
-      case 10008:       return "Order placed";
-      case 10009:       return "Request completed";
-      case 10010:       return "Only part of the request was completed";
-      case 10011:       return "Request processing error";
-      case 10012:       return "Request canceled by timeout";
-      case 10013:       return "Invalid request";
-      case 10014:       return "Invalid volume";
-      case 10015:       return "Invalid price";
-      case 10016:       return "Invalid stops";
-      case 10017:       return "Trade is disabled";
-      case 10018:       return "Market is closed";
-      case 10019:       return "Not enough money";
-      case 10020:       return "Prices changed";
-      case 10021:       return "No quotes";
-      case 10022:       return "Invalid order expiration";
-      case 10023:       return "Order state changed";
-      case 10024:       return "Too frequent requests";
-      case 10025:       return "No changes in request";
-      case 10026:       return "Autotrading disabled by server";
-      case 10027:       return "Autotrading disabled by client terminal";
-      case 10028:       return "Request locked";
-      case 10029:       return "Order or position frozen";
-      default:          return "Unknown error: " + IntegerToString(errorCode);
-   }
 }
