@@ -128,7 +128,8 @@ bool ConnectToServer()
    
    Print("🔄 Conectando a: ", url);
    
-   int ret = ws.ClientConnect(ServerIP, ServerPort, url);
+   // CORREGIDO: ClientConnect solo recibe el puerto como parámetro
+   int ret = ws.ClientConnect(ServerPort);
    if(ret < 0)
    {
       Print("❌ Error de conexión: ", ws.GetError());
@@ -226,6 +227,7 @@ void ProcessSignal(string jsonMessage)
    
    Print("📊 Señal válida: ", signal.pair, " | ", signal.type, " | SL: ", signal.sl, " | TP: ", signal.tp);
    
+   // CORREGIDO: IsTradeAllowed() no necesita parámetros
    if(AutoTrade && IsTradeAllowed())
    {
       ExecuteTradeWithRetry(signal);
@@ -322,7 +324,7 @@ bool ValidateSignal(SignalData &signal, string currentSymbol)
    // Validar spread
    if(MaxSpreadPoints > 0)
    {
-      double spread = SymbolInfoInteger(currentSymbol, SYMBOL_SPREAD);
+      long spread = SymbolInfoInteger(currentSymbol, SYMBOL_SPREAD);
       if(spread > MaxSpreadPoints)
       {
          Print("⚠️ Señal ignorada - Spread muy alto: ", spread, " puntos (máx ", MaxSpreadPoints, ")");
@@ -407,7 +409,7 @@ void ExecuteTradeWithRetry(SignalData &signal)
    Print("   Símbolo: ", signal.pair);
    Print("   Tipo: ", isBuy ? "COMPRA" : "VENTA");
    Print("   Volumen: ", volume);
-   Print("   Riesgo: ", RiskPercent, "% (", DoubleToString(balance * RiskPercent/100, 2), ")");
+   Print("   Riesgo: ", RiskPercent, "% (", DoubleToString(balance * RiskPercent/100.0, 2), ")");
    
    // PASO 1: Abrir orden con reintentos
    ulong ticket = OpenOrderWithRetry(signal.pair, isBuy, volume, entryPrice);
@@ -453,21 +455,25 @@ ulong OpenOrderWithRetry(string symbol, bool isBuy, double volume, double expect
       request.type_filling = FillingType;
       request.type_time = ORDER_TIME_GTC;
       request.magic = MagicNumber;
-      request.comment = "";
+      request.comment = "WebSocket Signal";
       
       Print("📝 Intento #", attempt, " - Precio: ", price);
       
       // Verificar margen si está activado
       if(CheckFreeMargin)
       {
-         double marginRequired = OrderCalcMargin(request.type, symbol, volume, price);
-         double freeMargin = AccountInfoDouble(ACCOUNT_FREEMARGIN);
-         
-         if(marginRequired > freeMargin * (MaxMarginUse/100.0))
+         double marginRequired = 0;
+         // CORREGIDO: OrderCalcMargin devuelve bool
+         if(OrderCalcMargin(request.type, symbol, volume, price, marginRequired))
          {
-            Print("⚠️ Intento ", attempt, ": Margen insuficiente");
-            Sleep(100); // Sleep fijo de 100ms (máximo 1 segundo)
-            continue;
+            double freeMargin = AccountInfoDouble(ACCOUNT_MARGIN_FREE); // CORREGIDO: Usar ACCOUNT_MARGIN_FREE
+         
+            if(marginRequired > freeMargin * (MaxMarginUse/100.0))
+            {
+               Print("⚠️ Intento ", attempt, ": Margen insuficiente");
+               Sleep(100); // Sleep fijo de 100ms (máximo 1 segundo)
+               continue;
+            }
          }
       }
       
@@ -615,20 +621,25 @@ double CalculateOptimalVolume(string symbol, double entryPrice, double stopLoss,
       lots = MathFloor(lots / volumeStep) * volumeStep;
    }
    
-   // Verificación final de margen
-   double marginRequired = OrderCalcMargin(
-      (entryPrice > stopLoss ? ORDER_TYPE_BUY : ORDER_TYPE_SELL), 
-      symbol, lots, entryPrice);
+   // CORREGIDO: Cast explícito de long a double
+   double marginRequired = 0;
+   ENUM_ORDER_TYPE orderType = (entryPrice > stopLoss) ? ORDER_TYPE_BUY : ORDER_TYPE_SELL;
    
-   double freeMargin = AccountInfoDouble(ACCOUNT_FREEMARGIN);
-   
-   if(marginRequired > freeMargin * (MaxMarginUse/100.0))
+   if(OrderCalcMargin(orderType, symbol, lots, entryPrice, marginRequired))
    {
-      // Reducir lotes proporcionalmente
-      double maxLotsByMargin = (freeMargin * (MaxMarginUse/100.0) * lots) / marginRequired;
-      lots = MathFloor(maxLotsByMargin / volumeStep) * volumeStep;
+      double freeMargin = AccountInfoDouble(ACCOUNT_MARGIN_FREE); // CORREGIDO: Usar ACCOUNT_MARGIN_FREE
       
-      Print("   Margen limitado: ajustando a ", lots);
+      if(marginRequired > freeMargin * (MaxMarginUse/100.0))
+      {
+         // Reducir lotes proporcionalmente
+         if(marginRequired > 0)
+         {
+            double maxLotsByMargin = (freeMargin * (MaxMarginUse/100.0) * lots) / marginRequired;
+            lots = MathFloor(maxLotsByMargin / volumeStep) * volumeStep;
+            
+            Print("   Margen limitado: ajustando a ", lots);
+         }
+      }
    }
    
    return NormalizeDouble(lots, 2);
