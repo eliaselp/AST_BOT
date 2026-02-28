@@ -3,7 +3,7 @@
 //|                                      Lectura desde archivo JSON  |
 //+------------------------------------------------------------------+
 #property copyright "Elias Eduardo Liranza Perez"
-#property version   "3.12"
+#property version   "3.13"
 #property strict
 #property description "EA que recibe señales vía archivo JSON y ejecuta operaciones"
 #property description "con gestión de riesgo y sistema de reintentos"
@@ -42,6 +42,7 @@ input group "=== CONFIGURACIÓN DE DEBUG ==="
 input bool     DebugMode          = true;       // Modo debug con logs detallados
 input bool     LogJsonContent     = true;       // Mostrar contenido JSON completo
 input bool     LogEverySecond     = true;       // Mostrar log cada segundo (aunque no haya archivo)
+input bool     LogFileOperations  = true;       // Mostrar operaciones de archivo detalladas
 
 //--- Global variables
 string lastSignalUUID = "";  // Variable global para almacenar el último UUID procesado
@@ -57,8 +58,8 @@ int timerCounter = 0;        // Contador para mostrar logs periódicos
 int OnInit()
 {
    Print("╔══════════════════════════════════════════════════════════════════════════╗");
-   Print("║                    🚀 JSON FILE EA - VERSIÓN 3.12                        ║");
-   Print("║                    📊 MODO DEBUG ACTIVADO - LOGS CADA SEGUNDO            ║");
+   Print("║                    🚀 JSON FILE EA - VERSIÓN 3.13                        ║");
+   Print("║                    📊 MODO DEBUG EXTREMO - LOGS DETALLADOS               ║");
    Print("╚══════════════════════════════════════════════════════════════════════════╝");
    
    // Validar parámetros
@@ -74,6 +75,27 @@ int OnInit()
    else
    {
       Print("✅ Archivo JSON encontrado: ", JsonFilePath);
+      
+      // Mostrar información del archivo
+      if(LogFileOperations)
+      {
+         Print("📁 Información del archivo:");
+         Print("   Ruta absoluta: ", JsonFilePath);
+         Print("   ¿Existe?: Sí");
+         
+         // Intentar abrir el archivo para ver permisos
+         int testHandle = FileOpen(JsonFilePath, FILE_READ|FILE_TXT|FILE_ANSI);
+         if(testHandle != INVALID_HANDLE)
+         {
+            Print("   ✅ Se puede abrir el archivo para lectura");
+            FileClose(testHandle);
+         }
+         else
+         {
+            int error = GetLastError();
+            Print("   ❌ NO se puede abrir el archivo. Error: ", error, " - ", GetErrorDescription(error));
+         }
+      }
    }
    
    Print("📊 Configuración de riesgo:");
@@ -85,6 +107,7 @@ int OnInit()
    Print("   Modo Debug: ", DebugMode ? "ACTIVADO" : "DESACTIVADO");
    Print("   Log JSON: ", LogJsonContent ? "ACTIVADO" : "DESACTIVADO");
    Print("   Log cada segundo: ", LogEverySecond ? "ACTIVADO" : "DESACTIVADO");
+   Print("   Log operaciones archivo: ", LogFileOperations ? "ACTIVADO" : "DESACTIVADO");
    
    Print("⏱️ Timer configurado cada ", FileCheckInterval, " segundo(s)");
    Print("📢 IMPORTANTE: Mostrando logs CADA SEGUNDO como solicitaste");
@@ -179,7 +202,8 @@ void OnTimer()
    if(LogEverySecond || DebugMode)
    {
       string timeStr = TimeToString(currentTime, TIME_SECONDS);
-      string statusStr = FileExists(JsonFilePath) ? "📂 ARCHIVO ENCONTRADO" : "⏳ ESPERANDO ARCHIVO";
+      bool fileExists = FileExists(JsonFilePath);
+      string statusStr = fileExists ? "📂 ARCHIVO ENCONTRADO" : "⏳ ESPERANDO ARCHIVO";
       
       Print("⏱️ [", timeStr, "] Segundo #", timerCounter, " - Verificando: ", JsonFilePath, " | ", statusStr);
    }
@@ -202,21 +226,65 @@ void CheckJsonFile()
          Print("⏳ [", TimeToString(checkTime, TIME_SECONDS), "] Esperando archivo: ", JsonFilePath);
          isFirstRun = false;
       }
-      // No mostramos más logs aquí porque ya mostramos el log cada segundo en OnTimer
+      else if(LogFileOperations)
+      {
+         // Log periódico de que sigue esperando (cada 30 segundos)
+         static datetime lastWaitLog = 0;
+         if(checkTime - lastWaitLog >= 30)
+         {
+            Print("⏳ [", TimeToString(checkTime, TIME_SECONDS), "] Aún esperando archivo: ", JsonFilePath);
+            lastWaitLog = checkTime;
+         }
+      }
       return;
    }
    
-   if(DebugMode)
+   if(DebugMode || LogFileOperations)
    {
-      Print("📂 [", TimeToString(checkTime, TIME_SECONDS), "] Archivo encontrado, leyendo contenido...");
+      Print("📂 [", TimeToString(checkTime, TIME_SECONDS), "] Archivo encontrado, intentando leer contenido...");
    }
    
    // Leer el archivo JSON
    string jsonContent = ReadJsonFile(JsonFilePath);
+   
+   // Verificar si se leyó correctamente
    if(jsonContent == "")
    {
       Print("❌ [", TimeToString(checkTime, TIME_SECONDS), "] Error al leer el archivo JSON - Archivo vacío o corrupto");
+      
+      // Intentar obtener más información sobre el error
+      int lastError = GetLastError();
+      if(lastError != 0)
+      {
+         Print("   Código de error: ", lastError, " - ", GetErrorDescription(lastError));
+      }
+      
+      // Verificar permisos del archivo
+      if(LogFileOperations)
+      {
+         int testHandle = FileOpen(JsonFilePath, FILE_READ|FILE_TXT|FILE_ANSI);
+         if(testHandle == INVALID_HANDLE)
+         {
+            int error = GetLastError();
+            Print("   ❌ No se puede abrir el archivo. Error: ", error, " - ", GetErrorDescription(error));
+         }
+         else
+         {
+            Print("   ✅ El archivo se puede abrir pero está vacío o tiene formato incorrecto");
+            FileClose(testHandle);
+         }
+      }
       return;
+   }
+   
+   // Mostrar información del archivo leído
+   Print("📖 [", TimeToString(checkTime, TIME_SECONDS), "] Archivo leído correctamente. Tamaño: ", StringLen(jsonContent), " caracteres");
+   
+   // Mostrar los primeros caracteres para verificar
+   if(LogFileOperations)
+   {
+      string preview = StringSubstr(jsonContent, 0, MathMin(100, StringLen(jsonContent)));
+      Print("   Vista previa (primeros 100 chars): '", preview, "'");
    }
    
    // Mostrar el JSON completo si está activado
@@ -229,13 +297,24 @@ void CheckJsonFile()
       string jsonLines[];
       int lines = ExplodeString(jsonContent, "\n", jsonLines);
       
-      for(int i = 0; i < lines; i++)
+      if(lines == 0)
       {
-         // Limitar longitud para no saturar el log
-         string line = jsonLines[i];
+         // Si no hay saltos de línea, mostrar el contenido completo
+         string line = jsonContent;
          if(StringLen(line) > 200)
             line = StringSubstr(line, 0, 200) + "... (truncado)";
          Print("║ ", line);
+      }
+      else
+      {
+         for(int i = 0; i < lines; i++)
+         {
+            // Limitar longitud para no saturar el log
+            string line = jsonLines[i];
+            if(StringLen(line) > 200)
+               line = StringSubstr(line, 0, 200) + "... (truncado)";
+            Print("║ ", line);
+         }
       }
       
       Print("╚══════════════════════════════════════════════════════════════════════════╝");
@@ -281,32 +360,70 @@ int ExplodeString(string str, string delimiter, string &result[])
 string ReadJsonFile(string filePath)
 {
    string content = "";
+   
+   if(LogFileOperations)
+   {
+      Print("   Intentando abrir archivo: ", filePath);
+   }
+   
    int fileHandle = FileOpen(filePath, FILE_READ|FILE_TXT|FILE_ANSI);
    
    if(fileHandle != INVALID_HANDLE)
    {
+      if(LogFileOperations)
+      {
+         Print("   ✅ Archivo abierto correctamente. Handle: ", fileHandle);
+      }
+      
       // Leer todo el contenido
       ulong fileSize = FileSize(fileHandle);
+      if(LogFileOperations)
+      {
+         Print("   Tamaño del archivo: ", fileSize, " bytes");
+      }
+      
       if(fileSize > 0)
       {
          content = FileReadString(fileHandle, (int)fileSize);
          
          if(DebugMode)
          {
-            Print("📖 Archivo leído correctamente. Tamaño: ", fileSize, " bytes");
+            Print("   📖 Archivo leído. Longitud del contenido: ", StringLen(content), " caracteres");
          }
       }
       else
       {
-         Print("⚠️ El archivo está vacío");
+         Print("⚠️ El archivo está vacío (tamaño 0 bytes)");
       }
       
       FileClose(fileHandle);
+      if(LogFileOperations)
+      {
+         Print("   Archivo cerrado");
+      }
    }
    else
    {
       int error = GetLastError();
       Print("❌ Error al abrir archivo: ", error, " - ", GetErrorDescription(error));
+      
+      // Información adicional sobre el error
+      if(error == 5002) // FILE_ERROR_FILENOTFOUND
+      {
+         Print("   El archivo no existe en la ruta especificada");
+      }
+      else if(error == 5004) // FILE_ERROR_TOOMANYOPENED
+      {
+         Print("   Demasiados archivos abiertos");
+      }
+      else if(error == 5006) // FILE_ERROR_INVALIDHANDLE
+      {
+         Print("   Handle inválido");
+      }
+      else if(error == 5010) // FILE_ERROR_ACCESS_DENIED
+      {
+         Print("   Acceso denegado - Verificar permisos del archivo");
+      }
    }
    
    return content;
@@ -317,7 +434,21 @@ string ReadJsonFile(string filePath)
 //+------------------------------------------------------------------+
 bool FileExists(string filePath)
 {
-   return FileIsExist(filePath);
+   bool exists = FileIsExist(filePath);
+   
+   if(LogFileOperations && !exists)
+   {
+      static datetime lastFileCheckLog = 0;
+      datetime currentTime = TimeCurrent();
+      
+      if(currentTime - lastFileCheckLog >= 30) // Log cada 30 segundos
+      {
+         Print("🔍 Verificando existencia de archivo: ", filePath, " -> ", exists ? "EXISTE" : "NO EXISTE");
+         lastFileCheckLog = currentTime;
+      }
+   }
+   
+   return exists;
 }
 
 //+------------------------------------------------------------------+
@@ -340,6 +471,18 @@ void ProcessSignal(string jsonMessage)
       {
          Print("🔍 Primeros 200 caracteres del JSON problemático:");
          Print("   ", StringSubstr(jsonMessage, 0, 200));
+         
+         // Intentar identificar el problema
+         if(StringFind(jsonMessage, "{") < 0)
+            Print("   ⚠️ El JSON no comienza con '{'");
+         if(StringFind(jsonMessage, "}") < 0)
+            Print("   ⚠️ El JSON no termina con '}'");
+         if(StringFind(jsonMessage, "uuid") < 0)
+            Print("   ⚠️ No se encuentra el campo 'uuid'");
+         if(StringFind(jsonMessage, "par") < 0)
+            Print("   ⚠️ No se encuentra el campo 'par'");
+         if(StringFind(jsonMessage, "tipo") < 0)
+            Print("   ⚠️ No se encuentra el campo 'tipo'");
       }
       return;
    }
