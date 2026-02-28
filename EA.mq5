@@ -3,7 +3,7 @@
 //|                                      Lectura desde archivo JSON  |
 //+------------------------------------------------------------------+
 #property copyright "Elias Eduardo Liranza Perez"
-#property version   "3.17"
+#property version   "3.18"
 #property strict
 #property description "EA que recibe señales vía archivo JSON y ejecuta operaciones"
 #property description "con gestión de riesgo y sistema de reintentos"
@@ -57,7 +57,7 @@ int timerCounter = 0;        // Contador para mostrar logs periódicos
 int OnInit()
 {
    Print("╔══════════════════════════════════════════════════════════════════════════╗");
-   Print("║                    🚀 JSON FILE EA - VERSIÓN 3.17                        ║");
+   Print("║                    🚀 JSON FILE EA - VERSIÓN 3.18                        ║");
    Print("║                    📊 LOGS EXHAUSTIVOS - LECTURA BINARIA                 ║");
    Print("╚══════════════════════════════════════════════════════════════════════════╝");
    
@@ -656,7 +656,7 @@ bool ValidateSignal(SignalData &signal, string currentSymbol)
 }
 
 //+------------------------------------------------------------------+
-//| Extraer valor de JSON - VERSIÓN MEJORADA                         |
+//| Extraer valor de JSON - VERSIÓN CORREGIDA (sin StringGetChar)   |
 //+------------------------------------------------------------------+
 string ExtractJsonValue(string json, string key)
 {
@@ -701,11 +701,18 @@ string ExtractJsonValue(string json, string key)
    StringTrimRight(result);
    StringTrimLeft(result);
    
-   // Quitar comillas si las tiene
-   if(StringLen(result) >= 2 && StringGetChar(result, 0) == '"' && 
-      StringGetChar(result, StringLen(result)-1) == '"')
+   // Quitar comillas si las tiene (versión corregida sin StringGetChar)
+   int resultLen = StringLen(result);
+   if(resultLen >= 2)
    {
-      result = StringSubstr(result, 1, StringLen(result)-2);
+      // Obtener primer y último carácter como string
+      string firstChar = StringSubstr(result, 0, 1);
+      string lastChar = StringSubstr(result, resultLen - 1, 1);
+      
+      if(firstChar == "\"" && lastChar == "\"")
+      {
+         result = StringSubstr(result, 1, resultLen - 2);
+      }
    }
    
    return result;
