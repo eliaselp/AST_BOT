@@ -3,7 +3,7 @@
 //|                                      Lectura desde archivo JSON  |
 //+------------------------------------------------------------------+
 #property copyright "Elias Eduardo Liranza Perez"
-#property version   "3.11"
+#property version   "3.12"
 #property strict
 #property description "EA que recibe señales vía archivo JSON y ejecuta operaciones"
 #property description "con gestión de riesgo y sistema de reintentos"
@@ -41,6 +41,7 @@ input double   MaxMarginUse       = 95.0;       // % Máx de margen a usar
 input group "=== CONFIGURACIÓN DE DEBUG ==="
 input bool     DebugMode          = true;       // Modo debug con logs detallados
 input bool     LogJsonContent     = true;       // Mostrar contenido JSON completo
+input bool     LogEverySecond     = true;       // Mostrar log cada segundo (aunque no haya archivo)
 
 //--- Global variables
 string lastSignalUUID = "";  // Variable global para almacenar el último UUID procesado
@@ -48,7 +49,7 @@ datetime lastFileCheck = 0;
 int totalSignals = 0;
 int totalTrades = 0;
 bool isFirstRun = true;
-datetime lastDebugTime = 0;
+int timerCounter = 0;        // Contador para mostrar logs periódicos
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
@@ -56,8 +57,8 @@ datetime lastDebugTime = 0;
 int OnInit()
 {
    Print("╔══════════════════════════════════════════════════════════════════════════╗");
-   Print("║                    🚀 JSON FILE EA - VERSIÓN 3.11                        ║");
-   Print("║                    📊 MODO DEBUG ACTIVADO - LOGS DETALLADOS              ║");
+   Print("║                    🚀 JSON FILE EA - VERSIÓN 3.12                        ║");
+   Print("║                    📊 MODO DEBUG ACTIVADO - LOGS CADA SEGUNDO            ║");
    Print("╚══════════════════════════════════════════════════════════════════════════╝");
    
    // Validar parámetros
@@ -83,8 +84,10 @@ int OnInit()
    Print("   Archivo JSON: ", JsonFilePath);
    Print("   Modo Debug: ", DebugMode ? "ACTIVADO" : "DESACTIVADO");
    Print("   Log JSON: ", LogJsonContent ? "ACTIVADO" : "DESACTIVADO");
+   Print("   Log cada segundo: ", LogEverySecond ? "ACTIVADO" : "DESACTIVADO");
    
    Print("⏱️ Timer configurado cada ", FileCheckInterval, " segundo(s)");
+   Print("📢 IMPORTANTE: Mostrando logs CADA SEGUNDO como solicitaste");
    
    EventSetTimer(FileCheckInterval);
    return INIT_SUCCEEDED;
@@ -169,16 +172,16 @@ string GetDeinitReasonText(int reason)
 //+------------------------------------------------------------------+
 void OnTimer()
 {
+   timerCounter++; // Incrementar contador cada segundo
    datetime currentTime = TimeCurrent();
    
-   if(DebugMode)
+   // MOSTRAR LOG CADA SEGUNDO - Esto es lo que pediste
+   if(LogEverySecond || DebugMode)
    {
-      // Imprimir cada 5 segundos para no saturar
-      if(currentTime - lastDebugTime >= 5 || lastDebugTime == 0)
-      {
-         Print("⏱️ [", TimeToString(currentTime, TIME_SECONDS), "] Verificando archivo JSON... (Intervalo: ", FileCheckInterval, "s)");
-         lastDebugTime = currentTime;
-      }
+      string timeStr = TimeToString(currentTime, TIME_SECONDS);
+      string statusStr = FileExists(JsonFilePath) ? "📂 ARCHIVO ENCONTRADO" : "⏳ ESPERANDO ARCHIVO";
+      
+      Print("⏱️ [", timeStr, "] Segundo #", timerCounter, " - Verificando: ", JsonFilePath, " | ", statusStr);
    }
    
    CheckJsonFile();
@@ -199,16 +202,7 @@ void CheckJsonFile()
          Print("⏳ [", TimeToString(checkTime, TIME_SECONDS), "] Esperando archivo: ", JsonFilePath);
          isFirstRun = false;
       }
-      else if(DebugMode)
-      {
-         // Log periódico de que sigue esperando (cada 30 segundos)
-         static datetime lastWaitLog = 0;
-         if(checkTime - lastWaitLog >= 30)
-         {
-            Print("⏳ [", TimeToString(checkTime, TIME_SECONDS), "] Aún esperando archivo: ", JsonFilePath);
-            lastWaitLog = checkTime;
-         }
-      }
+      // No mostramos más logs aquí porque ya mostramos el log cada segundo en OnTimer
       return;
    }
    
@@ -237,7 +231,11 @@ void CheckJsonFile()
       
       for(int i = 0; i < lines; i++)
       {
-         Print("║ ", jsonLines[i]);
+         // Limitar longitud para no saturar el log
+         string line = jsonLines[i];
+         if(StringLen(line) > 200)
+            line = StringSubstr(line, 0, 200) + "... (truncado)";
+         Print("║ ", line);
       }
       
       Print("╚══════════════════════════════════════════════════════════════════════════╝");
@@ -319,21 +317,7 @@ string ReadJsonFile(string filePath)
 //+------------------------------------------------------------------+
 bool FileExists(string filePath)
 {
-   bool exists = FileIsExist(filePath);
-   
-   if(DebugMode && !exists)
-   {
-      static datetime lastFileCheckLog = 0;
-      datetime currentTime = TimeCurrent();
-      
-      if(currentTime - lastFileCheckLog >= 60) // Log cada minuto
-      {
-         Print("🔍 Verificando existencia de archivo: ", filePath, " -> ", exists ? "EXISTE" : "NO EXISTE");
-         lastFileCheckLog = currentTime;
-      }
-   }
-   
-   return exists;
+   return FileIsExist(filePath);
 }
 
 //+------------------------------------------------------------------+
@@ -389,7 +373,6 @@ void ProcessSignal(string jsonMessage)
    Print("✅ [", TimeToString(processTime, TIME_SECONDS), "] Señal válida: ", 
          signal.pair, " | ", signal.type, " | SL: ", signal.sl, " | TP: ", signal.tp);
    
-   // CORREGIDO: IsTradeAllowed() no existe en MQL5
    bool tradeAllowed = TerminalInfoInteger(TERMINAL_TRADE_ALLOWED);
    Print("📊 Estado AutoTrade: ", AutoTrade ? "ACTIVADO" : "DESACTIVADO");
    Print("📊 Trading permitido por terminal: ", tradeAllowed ? "SÍ" : "NO");
@@ -452,7 +435,6 @@ struct SignalData
 bool ParseSignal(string json, SignalData &signal)
 {
    // CORRECCIÓN: StringTrimLeft y StringTrimRight modifican la variable original
-   // Primero aplicamos StringTrimRight y luego StringTrimLeft
    StringTrimRight(json);
    StringTrimLeft(json);
    
@@ -624,7 +606,6 @@ string ExtractJsonValue(string json, string key)
    }
    
    string result = StringSubstr(json, start, end - start);
-   // CORRECCIÓN: StringTrimLeft y StringTrimRight modifican la variable original
    StringTrimRight(result);
    StringTrimLeft(result);
    
