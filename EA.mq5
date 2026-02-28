@@ -3,7 +3,7 @@
 //|                                      Lectura desde archivo JSON  |
 //+------------------------------------------------------------------+
 #property copyright "Elias Eduardo Liranza Perez"
-#property version   "3.10"
+#property version   "3.11"
 #property strict
 #property description "EA que recibe señales vía archivo JSON y ejecuta operaciones"
 #property description "con gestión de riesgo y sistema de reintentos"
@@ -56,7 +56,7 @@ datetime lastDebugTime = 0;
 int OnInit()
 {
    Print("╔══════════════════════════════════════════════════════════════════════════╗");
-   Print("║                    🚀 JSON FILE EA - VERSIÓN 3.10                        ║");
+   Print("║                    🚀 JSON FILE EA - VERSIÓN 3.11                        ║");
    Print("║                    📊 MODO DEBUG ACTIVADO - LOGS DETALLADOS              ║");
    Print("╚══════════════════════════════════════════════════════════════════════════╝");
    
@@ -173,7 +173,7 @@ void OnTimer()
    
    if(DebugMode)
    {
-      // Imprimir cada 1 segundo que está leyendo (solo cada 5 segundos para no saturar)
+      // Imprimir cada 5 segundos para no saturar
       if(currentTime - lastDebugTime >= 5 || lastDebugTime == 0)
       {
          Print("⏱️ [", TimeToString(currentTime, TIME_SECONDS), "] Verificando archivo JSON... (Intervalo: ", FileCheckInterval, "s)");
@@ -451,8 +451,10 @@ struct SignalData
 //+------------------------------------------------------------------+
 bool ParseSignal(string json, SignalData &signal)
 {
-   // Limpiar posibles caracteres de control al inicio/final
-   json = StringTrimLeft(StringTrimRight(json));
+   // CORRECCIÓN: StringTrimLeft y StringTrimRight modifican la variable original
+   // Primero aplicamos StringTrimRight y luego StringTrimLeft
+   StringTrimRight(json);
+   StringTrimLeft(json);
    
    if(DebugMode)
    {
@@ -622,7 +624,9 @@ string ExtractJsonValue(string json, string key)
    }
    
    string result = StringSubstr(json, start, end - start);
-   result = StringTrimLeft(StringTrimRight(result));
+   // CORRECCIÓN: StringTrimLeft y StringTrimRight modifican la variable original
+   StringTrimRight(result);
+   StringTrimLeft(result);
    
    return result;
 }
