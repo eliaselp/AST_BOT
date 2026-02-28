@@ -3,7 +3,7 @@
 //|                                      Lectura desde archivo JSON  |
 //+------------------------------------------------------------------+
 #property copyright "Elias Eduardo Liranza Perez"
-#property version   "3.13"
+#property version   "3.14"
 #property strict
 #property description "EA que recibe señales vía archivo JSON y ejecuta operaciones"
 #property description "con gestión de riesgo y sistema de reintentos"
@@ -58,8 +58,8 @@ int timerCounter = 0;        // Contador para mostrar logs periódicos
 int OnInit()
 {
    Print("╔══════════════════════════════════════════════════════════════════════════╗");
-   Print("║                    🚀 JSON FILE EA - VERSIÓN 3.13                        ║");
-   Print("║                    📊 MODO DEBUG EXTREMO - LOGS DETALLADOS               ║");
+   Print("║                    🚀 JSON FILE EA - VERSIÓN 3.14                        ║");
+   Print("║                    📊 MODO DEBUG FORZADO - TODOS LOS LOGS ACTIVADOS      ║");
    Print("╚══════════════════════════════════════════════════════════════════════════╝");
    
    // Validar parámetros
@@ -77,24 +77,32 @@ int OnInit()
       Print("✅ Archivo JSON encontrado: ", JsonFilePath);
       
       // Mostrar información del archivo
-      if(LogFileOperations)
+      Print("📁 Información del archivo:");
+      Print("   Ruta absoluta: ", JsonFilePath);
+      Print("   ¿Existe?: Sí");
+      
+      // Intentar abrir el archivo para ver permisos
+      int testHandle = FileOpen(JsonFilePath, FILE_READ|FILE_TXT|FILE_ANSI);
+      if(testHandle != INVALID_HANDLE)
       {
-         Print("📁 Información del archivo:");
-         Print("   Ruta absoluta: ", JsonFilePath);
-         Print("   ¿Existe?: Sí");
+         Print("   ✅ Se puede abrir el archivo para lectura");
          
-         // Intentar abrir el archivo para ver permisos
-         int testHandle = FileOpen(JsonFilePath, FILE_READ|FILE_TXT|FILE_ANSI);
-         if(testHandle != INVALID_HANDLE)
+         // Leer el tamaño del archivo
+         ulong fileSize = FileSize(testHandle);
+         Print("   Tamaño del archivo: ", fileSize, " bytes");
+         
+         if(fileSize > 0)
          {
-            Print("   ✅ Se puede abrir el archivo para lectura");
-            FileClose(testHandle);
+            string testContent = FileReadString(testHandle, (int)MathMin(fileSize, 100));
+            Print("   Primeros caracteres: '", testContent, "'");
          }
-         else
-         {
-            int error = GetLastError();
-            Print("   ❌ NO se puede abrir el archivo. Error: ", error, " - ", GetErrorDescription(error));
-         }
+         
+         FileClose(testHandle);
+      }
+      else
+      {
+         int error = GetLastError();
+         Print("   ❌ NO se puede abrir el archivo. Error: ", error, " - ", GetErrorDescription(error));
       }
    }
    
@@ -104,13 +112,13 @@ int OnInit()
    Print("   Intentos apertura: ", MaxOpenAttempts);
    Print("   Intentos SL/TP: ", MaxModifyAttempts);
    Print("   Archivo JSON: ", JsonFilePath);
-   Print("   Modo Debug: ", DebugMode ? "ACTIVADO" : "DESACTIVADO");
+   Print("   Modo Debug: ACTIVADO FORZADAMENTE");
    Print("   Log JSON: ", LogJsonContent ? "ACTIVADO" : "DESACTIVADO");
    Print("   Log cada segundo: ", LogEverySecond ? "ACTIVADO" : "DESACTIVADO");
-   Print("   Log operaciones archivo: ", LogFileOperations ? "ACTIVADO" : "DESACTIVADO");
+   Print("   Log operaciones archivo: ACTIVADO FORZADAMENTE");
    
    Print("⏱️ Timer configurado cada ", FileCheckInterval, " segundo(s)");
-   Print("📢 IMPORTANTE: Mostrando logs CADA SEGUNDO como solicitaste");
+   Print("📢 IMPORTANTE: Forzando logs de archivo para diagnóstico");
    
    EventSetTimer(FileCheckInterval);
    return INIT_SUCCEEDED;
@@ -198,15 +206,12 @@ void OnTimer()
    timerCounter++; // Incrementar contador cada segundo
    datetime currentTime = TimeCurrent();
    
-   // MOSTRAR LOG CADA SEGUNDO - Esto es lo que pediste
-   if(LogEverySecond || DebugMode)
-   {
-      string timeStr = TimeToString(currentTime, TIME_SECONDS);
-      bool fileExists = FileExists(JsonFilePath);
-      string statusStr = fileExists ? "📂 ARCHIVO ENCONTRADO" : "⏳ ESPERANDO ARCHIVO";
-      
-      Print("⏱️ [", timeStr, "] Segundo #", timerCounter, " - Verificando: ", JsonFilePath, " | ", statusStr);
-   }
+   // MOSTRAR LOG CADA SEGUNDO
+   string timeStr = TimeToString(currentTime, TIME_SECONDS);
+   bool fileExists = FileExists(JsonFilePath);
+   string statusStr = fileExists ? "📂 ARCHIVO ENCONTRADO" : "⏳ ESPERANDO ARCHIVO";
+   
+   Print("⏱️ [", timeStr, "] Segundo #", timerCounter, " - Verificando: ", JsonFilePath, " | ", statusStr);
    
    CheckJsonFile();
 }
@@ -217,32 +222,21 @@ void OnTimer()
 void CheckJsonFile()
 {
    datetime checkTime = TimeCurrent();
+   string timeStr = TimeToString(checkTime, TIME_SECONDS);
    
    // Verificar si el archivo existe
    if(!FileExists(JsonFilePath))
    {
       if(isFirstRun)
       {
-         Print("⏳ [", TimeToString(checkTime, TIME_SECONDS), "] Esperando archivo: ", JsonFilePath);
+         Print("⏳ [", timeStr, "] Esperando archivo: ", JsonFilePath);
          isFirstRun = false;
-      }
-      else if(LogFileOperations)
-      {
-         // Log periódico de que sigue esperando (cada 30 segundos)
-         static datetime lastWaitLog = 0;
-         if(checkTime - lastWaitLog >= 30)
-         {
-            Print("⏳ [", TimeToString(checkTime, TIME_SECONDS), "] Aún esperando archivo: ", JsonFilePath);
-            lastWaitLog = checkTime;
-         }
       }
       return;
    }
    
-   if(DebugMode || LogFileOperations)
-   {
-      Print("📂 [", TimeToString(checkTime, TIME_SECONDS), "] Archivo encontrado, intentando leer contenido...");
-   }
+   // SIEMPRE mostrar cuando encuentra el archivo
+   Print("📂 [", timeStr, "] ⚠️⚠️⚠️ ARCHIVO ENCONTRADO - Intentando leer... ⚠️⚠️⚠️");
    
    // Leer el archivo JSON
    string jsonContent = ReadJsonFile(JsonFilePath);
@@ -250,7 +244,7 @@ void CheckJsonFile()
    // Verificar si se leyó correctamente
    if(jsonContent == "")
    {
-      Print("❌ [", TimeToString(checkTime, TIME_SECONDS), "] Error al leer el archivo JSON - Archivo vacío o corrupto");
+      Print("❌ [", timeStr, "] ERROR: Archivo vacío o no se pudo leer");
       
       // Intentar obtener más información sobre el error
       int lastError = GetLastError();
@@ -259,70 +253,43 @@ void CheckJsonFile()
          Print("   Código de error: ", lastError, " - ", GetErrorDescription(lastError));
       }
       
-      // Verificar permisos del archivo
-      if(LogFileOperations)
+      // Verificar permisos del archivo AHORA MISMO
+      Print("   🔍 Verificando acceso al archivo en este momento:");
+      int testHandle = FileOpen(JsonFilePath, FILE_READ|FILE_TXT|FILE_ANSI);
+      if(testHandle == INVALID_HANDLE)
       {
-         int testHandle = FileOpen(JsonFilePath, FILE_READ|FILE_TXT|FILE_ANSI);
-         if(testHandle == INVALID_HANDLE)
-         {
-            int error = GetLastError();
-            Print("   ❌ No se puede abrir el archivo. Error: ", error, " - ", GetErrorDescription(error));
-         }
-         else
-         {
-            Print("   ✅ El archivo se puede abrir pero está vacío o tiene formato incorrecto");
-            FileClose(testHandle);
-         }
-      }
-      return;
-   }
-   
-   // Mostrar información del archivo leído
-   Print("📖 [", TimeToString(checkTime, TIME_SECONDS), "] Archivo leído correctamente. Tamaño: ", StringLen(jsonContent), " caracteres");
-   
-   // Mostrar los primeros caracteres para verificar
-   if(LogFileOperations)
-   {
-      string preview = StringSubstr(jsonContent, 0, MathMin(100, StringLen(jsonContent)));
-      Print("   Vista previa (primeros 100 chars): '", preview, "'");
-   }
-   
-   // Mostrar el JSON completo si está activado
-   if(LogJsonContent)
-   {
-      Print("📄 [", TimeToString(checkTime, TIME_SECONDS), "] CONTENIDO JSON COMPLETO:");
-      Print("╔══════════════════════════════════════════════════════════════════════════╗");
-      
-      // Dividir el JSON en líneas para mejor visualización
-      string jsonLines[];
-      int lines = ExplodeString(jsonContent, "\n", jsonLines);
-      
-      if(lines == 0)
-      {
-         // Si no hay saltos de línea, mostrar el contenido completo
-         string line = jsonContent;
-         if(StringLen(line) > 200)
-            line = StringSubstr(line, 0, 200) + "... (truncado)";
-         Print("║ ", line);
+         int error = GetLastError();
+         Print("   ❌ NO se puede abrir el archivo AHORA MISMO. Error: ", error, " - ", GetErrorDescription(error));
       }
       else
       {
-         for(int i = 0; i < lines; i++)
+         ulong size = FileSize(testHandle);
+         Print("   ✅ El archivo SE PUEDE ABRIR ahora. Tamaño: ", size, " bytes");
+         
+         if(size > 0)
          {
-            // Limitar longitud para no saturar el log
-            string line = jsonLines[i];
-            if(StringLen(line) > 200)
-               line = StringSubstr(line, 0, 200) + "... (truncado)";
-            Print("║ ", line);
+            string testContent = FileReadString(testHandle, (int)MathMin(size, 50));
+            Print("   Contenido (primeros 50 chars): '", testContent, "'");
          }
+         
+         FileClose(testHandle);
       }
       
-      Print("╚══════════════════════════════════════════════════════════════════════════╝");
+      return;
    }
+   
+   // SIEMPRE mostrar cuando se lee correctamente
+   Print("✅✅✅ [", timeStr, "] ARCHIVO LEÍDO CORRECTAMENTE ✅✅✅");
+   Print("   Tamaño: ", StringLen(jsonContent), " caracteres");
+   Print("   Contenido completo: '", jsonContent, "'");
+   
+   // Mostrar los primeros caracteres siempre
+   string preview = StringSubstr(jsonContent, 0, MathMin(200, StringLen(jsonContent)));
+   Print("   Vista previa: '", preview, "'");
    
    totalSignals++;
    lastFileCheck = checkTime;
-   Print("📩 [", TimeToString(checkTime, TIME_SECONDS), "] Señal #", totalSignals, " recibida (tamaño: ", StringLen(jsonContent), " bytes)");
+   Print("📩 [", timeStr, "] Señal #", totalSignals, " recibida");
    
    ProcessSignal(jsonContent);
 }
@@ -360,52 +327,38 @@ int ExplodeString(string str, string delimiter, string &result[])
 string ReadJsonFile(string filePath)
 {
    string content = "";
+   datetime now = TimeCurrent();
+   string timeStr = TimeToString(now, TIME_SECONDS);
    
-   if(LogFileOperations)
-   {
-      Print("   Intentando abrir archivo: ", filePath);
-   }
+   Print("   [", timeStr, "] 🔧 ReadJsonFile: Intentando abrir: ", filePath);
    
    int fileHandle = FileOpen(filePath, FILE_READ|FILE_TXT|FILE_ANSI);
    
    if(fileHandle != INVALID_HANDLE)
    {
-      if(LogFileOperations)
-      {
-         Print("   ✅ Archivo abierto correctamente. Handle: ", fileHandle);
-      }
+      Print("   ✅ ReadJsonFile: Archivo abierto. Handle: ", fileHandle);
       
       // Leer todo el contenido
       ulong fileSize = FileSize(fileHandle);
-      if(LogFileOperations)
-      {
-         Print("   Tamaño del archivo: ", fileSize, " bytes");
-      }
+      Print("   📏 ReadJsonFile: Tamaño del archivo: ", fileSize, " bytes");
       
       if(fileSize > 0)
       {
          content = FileReadString(fileHandle, (int)fileSize);
-         
-         if(DebugMode)
-         {
-            Print("   📖 Archivo leído. Longitud del contenido: ", StringLen(content), " caracteres");
-         }
+         Print("   📖 ReadJsonFile: Leídos ", StringLen(content), " caracteres");
       }
       else
       {
-         Print("⚠️ El archivo está vacío (tamaño 0 bytes)");
+         Print("⚠️ ReadJsonFile: El archivo está vacío (tamaño 0 bytes)");
       }
       
       FileClose(fileHandle);
-      if(LogFileOperations)
-      {
-         Print("   Archivo cerrado");
-      }
+      Print("   ✅ ReadJsonFile: Archivo cerrado");
    }
    else
    {
       int error = GetLastError();
-      Print("❌ Error al abrir archivo: ", error, " - ", GetErrorDescription(error));
+      Print("❌ ReadJsonFile: Error al abrir archivo: ", error, " - ", GetErrorDescription(error));
       
       // Información adicional sobre el error
       if(error == 5002) // FILE_ERROR_FILENOTFOUND
@@ -435,19 +388,6 @@ string ReadJsonFile(string filePath)
 bool FileExists(string filePath)
 {
    bool exists = FileIsExist(filePath);
-   
-   if(LogFileOperations && !exists)
-   {
-      static datetime lastFileCheckLog = 0;
-      datetime currentTime = TimeCurrent();
-      
-      if(currentTime - lastFileCheckLog >= 30) // Log cada 30 segundos
-      {
-         Print("🔍 Verificando existencia de archivo: ", filePath, " -> ", exists ? "EXISTE" : "NO EXISTE");
-         lastFileCheckLog = currentTime;
-      }
-   }
-   
    return exists;
 }
 
@@ -458,36 +398,33 @@ void ProcessSignal(string jsonMessage)
 {
    datetime processTime = TimeCurrent();
    string currentSymbol = Symbol();
+   string timeStr = TimeToString(processTime, TIME_SECONDS);
    
-   Print("⚙️ [", TimeToString(processTime, TIME_SECONDS), "] Procesando señal #", totalSignals, "...");
+   Print("⚙️ [", timeStr, "] Procesando señal #", totalSignals, "...");
+   Print("   JSON a parsear: '", jsonMessage, "'");
    
    // Parsear JSON con manejo de errores
    SignalData signal;
    if(!ParseSignal(jsonMessage, signal))
    {
-      Print("❌ [", TimeToString(processTime, TIME_SECONDS), "] Error parseando JSON - Formato inválido");
+      Print("❌ [", timeStr, "] Error parseando JSON - Formato inválido");
       
-      if(DebugMode)
-      {
-         Print("🔍 Primeros 200 caracteres del JSON problemático:");
-         Print("   ", StringSubstr(jsonMessage, 0, 200));
-         
-         // Intentar identificar el problema
-         if(StringFind(jsonMessage, "{") < 0)
-            Print("   ⚠️ El JSON no comienza con '{'");
-         if(StringFind(jsonMessage, "}") < 0)
-            Print("   ⚠️ El JSON no termina con '}'");
-         if(StringFind(jsonMessage, "uuid") < 0)
-            Print("   ⚠️ No se encuentra el campo 'uuid'");
-         if(StringFind(jsonMessage, "par") < 0)
-            Print("   ⚠️ No se encuentra el campo 'par'");
-         if(StringFind(jsonMessage, "tipo") < 0)
-            Print("   ⚠️ No se encuentra el campo 'tipo'");
-      }
+      Print("🔍 Análisis del JSON:");
+      if(StringFind(jsonMessage, "{") < 0)
+         Print("   ⚠️ El JSON no comienza con '{'");
+      if(StringFind(jsonMessage, "}") < 0)
+         Print("   ⚠️ El JSON no termina con '}'");
+      if(StringFind(jsonMessage, "uuid") < 0)
+         Print("   ⚠️ No se encuentra el campo 'uuid'");
+      if(StringFind(jsonMessage, "par") < 0)
+         Print("   ⚠️ No se encuentra el campo 'par'");
+      if(StringFind(jsonMessage, "tipo") < 0)
+         Print("   ⚠️ No se encuentra el campo 'tipo'");
+      
       return;
    }
    
-   Print("✅ [", TimeToString(processTime, TIME_SECONDS), "] JSON parseado correctamente");
+   Print("✅ [", timeStr, "] JSON parseado correctamente");
    Print("   UUID: ", signal.uuid);
    Print("   Par: ", signal.pair);
    Print("   Tipo: ", signal.type);
@@ -498,7 +435,7 @@ void ProcessSignal(string jsonMessage)
    // Verificar UUID para evitar duplicados
    if(signal.uuid == lastSignalUUID && lastSignalUUID != "")
    {
-      Print("⏭️ [", TimeToString(processTime, TIME_SECONDS), "] Señal duplicada ignorada (UUID: ", signal.uuid, ")");
+      Print("⏭️ [", timeStr, "] Señal duplicada ignorada (UUID: ", signal.uuid, ")");
       Print("   Último UUID procesado: ", lastSignalUUID);
       return;
    }
@@ -509,11 +446,11 @@ void ProcessSignal(string jsonMessage)
    // Aplicar todos los filtros y validaciones
    if(!ValidateSignal(signal, currentSymbol))
    {
-      Print("❌ [", TimeToString(processTime, TIME_SECONDS), "] Señal rechazada por validaciones");
+      Print("❌ [", timeStr, "] Señal rechazada por validaciones");
       return;
    }
    
-   Print("✅ [", TimeToString(processTime, TIME_SECONDS), "] Señal válida: ", 
+   Print("✅ [", timeStr, "] Señal válida: ", 
          signal.pair, " | ", signal.type, " | SL: ", signal.sl, " | TP: ", signal.tp);
    
    bool tradeAllowed = TerminalInfoInteger(TERMINAL_TRADE_ALLOWED);
@@ -577,14 +514,11 @@ struct SignalData
 //+------------------------------------------------------------------+
 bool ParseSignal(string json, SignalData &signal)
 {
-   // CORRECCIÓN: StringTrimLeft y StringTrimRight modifican la variable original
+   // Limpiar posibles caracteres de control al inicio/final
    StringTrimRight(json);
    StringTrimLeft(json);
    
-   if(DebugMode)
-   {
-      Print("🔍 Parseando JSON...");
-   }
+   Print("🔍 Parseando JSON: '", json, "'");
    
    signal.uuid = ExtractJsonValue(json, "uuid");
    signal.pair = ExtractJsonValue(json, "par");
@@ -597,16 +531,13 @@ bool ParseSignal(string json, SignalData &signal)
    string pipsSlStr = ExtractJsonValue(json, "pips_sl");
    string ratioStr = ExtractJsonValue(json, "ratio");
    
-   if(DebugMode)
-   {
-      Print("   Valores extraídos (raw):");
-      Print("   uuid: '", signal.uuid, "'");
-      Print("   par: '", signal.pair, "'");
-      Print("   tipo: '", signal.type, "'");
-      Print("   entrada: '", entryStr, "'");
-      Print("   sl: '", slStr, "'");
-      Print("   tp: '", tpStr, "'");
-   }
+   Print("   Valores extraídos:");
+   Print("   uuid: '", signal.uuid, "'");
+   Print("   par: '", signal.pair, "'");
+   Print("   tipo: '", signal.type, "'");
+   Print("   entrada: '", entryStr, "'");
+   Print("   sl: '", slStr, "'");
+   Print("   tp: '", tpStr, "'");
    
    signal.entry = StringToDouble(entryStr);
    signal.sl = StringToDouble(slStr);
@@ -654,13 +585,14 @@ bool ParseSignal(string json, SignalData &signal)
 bool ValidateSignal(SignalData &signal, string currentSymbol)
 {
    datetime validTime = TimeCurrent();
+   string timeStr = TimeToString(validTime, TIME_SECONDS);
    
-   Print("🔍 [", TimeToString(validTime, TIME_SECONDS), "] Validando señal...");
+   Print("🔍 [", timeStr, "] Validando señal...");
    
    // Validar símbolo
    if(ValidateSymbol && signal.pair != currentSymbol)
    {
-      Print("⚠️ [", TimeToString(validTime, TIME_SECONDS), "] Señal para ", signal.pair, 
+      Print("⚠️ [", timeStr, "] Señal para ", signal.pair, 
             " ignorada - Este EA opera en ", currentSymbol);
       return false;
    }
@@ -668,13 +600,13 @@ bool ValidateSignal(SignalData &signal, string currentSymbol)
    // Validar que tenemos SL y TP
    if(signal.sl <= 0)
    {
-      Print("⚠️ [", TimeToString(validTime, TIME_SECONDS), "] Señal ignorada - SL inválido (<=0): ", signal.sl);
+      Print("⚠️ [", timeStr, "] Señal ignorada - SL inválido (<=0): ", signal.sl);
       return false;
    }
    
    if(signal.tp <= 0)
    {
-      Print("⚠️ [", TimeToString(validTime, TIME_SECONDS), "] Señal ignorada - TP inválido (<=0): ", signal.tp);
+      Print("⚠️ [", timeStr, "] Señal ignorada - TP inválido (<=0): ", signal.tp);
       return false;
    }
    
@@ -695,14 +627,14 @@ bool ValidateSignal(SignalData &signal, string currentSymbol)
    
    if(slPoints < MinSLPoints)
    {
-      Print("⚠️ [", TimeToString(validTime, TIME_SECONDS), "] Señal ignorada - SL demasiado pequeño: ", 
+      Print("⚠️ [", timeStr, "] Señal ignorada - SL demasiado pequeño: ", 
             slPoints, " puntos (mínimo ", MinSLPoints, ")");
       return false;
    }
    
    if(tpPoints < MinTPPoints)
    {
-      Print("⚠️ [", TimeToString(validTime, TIME_SECONDS), "] Señal ignorada - TP demasiado pequeño: ", 
+      Print("⚠️ [", timeStr, "] Señal ignorada - TP demasiado pequeño: ", 
             tpPoints, " puntos (mínimo ", MinTPPoints, ")");
       return false;
    }
@@ -710,12 +642,12 @@ bool ValidateSignal(SignalData &signal, string currentSymbol)
    // Validar spread
    if(MaxSpreadPoints > 0 && spread > MaxSpreadPoints)
    {
-      Print("⚠️ [", TimeToString(validTime, TIME_SECONDS), "] Señal ignorada - Spread muy alto: ", 
+      Print("⚠️ [", timeStr, "] Señal ignorada - Spread muy alto: ", 
             spread, " puntos (máx ", MaxSpreadPoints, ")");
       return false;
    }
    
-   Print("✅ [", TimeToString(validTime, TIME_SECONDS), "] Todas las validaciones superadas");
+   Print("✅ [", timeStr, "] Todas las validaciones superadas");
    return true;
 }
 
@@ -761,7 +693,9 @@ string ExtractJsonValue(string json, string key)
 bool ExecuteTradeWithRetry(SignalData &signal)
 {
    datetime execTime = TimeCurrent();
-   Print("🚀 [", TimeToString(execTime, TIME_SECONDS), "] INICIANDO EJECUCIÓN DE ORDEN");
+   string timeStr = TimeToString(execTime, TIME_SECONDS);
+   
+   Print("🚀 [", timeStr, "] INICIANDO EJECUCIÓN DE ORDEN");
    
    // Obtener balance para gestión de riesgo
    double balance = (BalanceReferencia > 0) ? BalanceReferencia : AccountInfoDouble(ACCOUNT_BALANCE);
