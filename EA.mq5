@@ -17,25 +17,10 @@ input int      FileCheckInterval = 1;           // Intervalo de revisión (segun
 input group "=== GESTIÓN DE RIESGO ==="
 input double   BalanceReferencia = 0;          // 0 = usar balance real
 input double   RiskPercent       = 1.0;        // % de riesgo por operación
-input double   MaxRiskMoney      = 0;          // 0 = sin límite máximo
 
 //--- Input parameters - EJECUCIÓN
 input group "=== CONFIGURACIÓN DE EJECUCIÓN ==="
-input bool     AutoTrade         = true;
-input int      MaxOpenAttempts    = 10;        // Máx intentos para abrir
-input int      MaxModifyAttempts  = 10;        // Máx intentos para SL/TP
-input int      Deviation          = 10;        // Desviación permitida
 input ENUM_ORDER_TYPE_FILLING FillingType = ORDER_FILLING_FOK;  // Tipo de filling
-input int      MagicNumber        = 234000;    // Magic number del EA
-
-//--- Input parameters - VALIDACIONES
-input group "=== VALIDACIONES ==="
-input bool     ValidateSymbol     = false;     // Validar símbolo de la señal
-input double   MinSLPoints        = 0;         // Mínimo SL en puntos
-input double   MinTPPoints        = 0;         // Mínimo TP en puntos
-input double   MaxSpreadPoints    = 0;         // 0 = sin límite
-input bool     CheckFreeMargin    = true;      // Verificar margen libre
-input double   MaxMarginUse       = 95.0;      // % Máx de margen a usar
 
 //--- Input parameters - DEBUG
 input group "=== CONFIGURACIÓN DE DEBUG ==="
@@ -50,6 +35,20 @@ int totalSignals = 0;
 int totalTrades = 0;
 bool isFirstRun = true;
 int timerCounter = 0;        // Contador para mostrar logs periódicos
+
+//--- Variables globales de configuración (antes eran inputs)
+double   MaxRiskMoney = 0;          // 0 = sin límite máximo
+nt      MaxOpenAttempts = 10;      // Máx intentos para abrir
+int      MaxModifyAttempts = 10;    // Máx intentos para SL/TP
+int      Deviation = 10;            // Desviación permitida
+bool     AutoTrade = true;          // Auto trading
+int      MagicNumber = 234000;      // Magic number del EA
+bool     ValidateSymbol = false;    // Validar símbolo de la señal
+double   MinSLPoints = 0;           // Mínimo SL en puntos
+double   MinTPPoints = 0;           // Mínimo TP en puntos
+double   MaxSpreadPoints = 0;       // 0 = sin límite
+bool     CheckFreeMargin = true;    // Verificar margen libre
+double   MaxMarginUse = 98.0;       // % Máx de margen a usar
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
