@@ -15,7 +15,10 @@ import websocket_master_client
 
 async def notificar_signal_websocket(señal_trading):
     """Ejemplo de cómo usar el cliente"""
-    
+    if señal_trading['tipo'] == 'LONG':
+        señal_trading['tipo'] = 'COMPRA'
+    elif señal_trading['tipo'] == 'SHORT':
+        señal_trading['tipo'] = 'VENTA'
     # Crear cliente y conectar
     cliente = websocket_master_client.WebSocketMaster(
         room_name=config.room_name,
@@ -145,4 +148,5 @@ def main():
 
 
 if __name__ == "__main__":
+
     main()
