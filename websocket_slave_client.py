@@ -114,10 +114,10 @@ class WebSocketSlave:
         self.running = False
 
 async def main():
-    ROOM_NAME = "PRIMERA-SALA"
-    TOKEN = "9e273534-4fe6-49b5-9b81-45a75912bf57"
+    ROOM_NAME = "EURUSD"
+    TOKEN = "d519c54e-cb1d-465f-b561-c8013d68b76b"
     DOMINIO = "216.226.149.70:8000"
-    JSON_FILE_PATH = "C:\\señales\\senal.json"
+    JSON_FILE_PATH = "C:\\Users\\InfosaicUser\\AppData\\Roaming\\MetaQuotes\\Terminal\\D0E8209F77C8CF37AD8BF550E51FF075\\MQL5\\Files\\senal.json"
     
     slave = WebSocketSlave(
         room_name=ROOM_NAME,

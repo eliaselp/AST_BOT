@@ -46,6 +46,7 @@ class WebSocketMaster:
             await self.websocket.close()
             print("🔌 Desconectado")
 
+'''
 async def ejemplo_uso():
     """Ejemplo de cómo usar el cliente"""
     
@@ -77,3 +78,5 @@ async def ejemplo_uso():
 
 if __name__ == "__main__":
     asyncio.run(ejemplo_uso())
+    
+'''

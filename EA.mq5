@@ -38,7 +38,7 @@ int timerCounter = 0;        // Contador para mostrar logs periódicos
 
 //--- Variables globales de configuración (antes eran inputs)
 double   MaxRiskMoney = 0;          // 0 = sin límite máximo
-nt      MaxOpenAttempts = 10;      // Máx intentos para abrir
+int      MaxOpenAttempts = 10;      // Máx intentos para abrir
 int      MaxModifyAttempts = 10;    // Máx intentos para SL/TP
 int      Deviation = 10;            // Desviación permitida
 bool     AutoTrade = true;          // Auto trading
