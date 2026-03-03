@@ -1,0 +1,347 @@
+
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Optimización Bitmask - Resultados</title>
+            <style>
+                body { 
+                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                    margin: 20px;
+                    background: #f5f5f5;
+                }
+                .container { 
+                    max-width: 1400px; 
+                    margin: 0 auto;
+                    background: white;
+                    padding: 30px;
+                    border-radius: 15px;
+                    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+                }
+                h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 10px; }
+                h2 { color: #34495e; margin-top: 30px; }
+                .stats-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                    gap: 15px;
+                    margin: 20px 0;
+                }
+                .stat-box {
+                    background: #f8f9fa;
+                    padding: 15px;
+                    border-radius: 8px;
+                    border-left: 4px solid #3498db;
+                }
+                .stat-box .label {
+                    color: #7f8c8d;
+                    font-size: 14px;
+                    text-transform: uppercase;
+                }
+                .stat-box .value {
+                    color: #2c3e50;
+                    font-size: 24px;
+                    font-weight: bold;
+                }
+                .stat-box .sub {
+                    color: #95a5a6;
+                    font-size: 12px;
+                }
+                .mejor-config { 
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white; 
+                    padding: 25px; 
+                    border-radius: 10px;
+                    margin: 20px 0;
+                }
+                .comparison-grid {
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: 20px;
+                    margin: 20px 0;
+                }
+                .config-card {
+                    background: white;
+                    border-radius: 10px;
+                    padding: 20px;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                }
+                .config-card.original { border-left: 5px solid #3498db; }
+                .config-card.optimized { border-left: 5px solid #27ae60; }
+                .badge-optimized { background: #27ae60; color: white; padding: 3px 8px; border-radius: 3px; }
+                table { 
+                    width: 100%; 
+                    border-collapse: collapse; 
+                    margin: 20px 0;
+                    background: white;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                }
+                th, td { 
+                    padding: 12px; 
+                    text-align: left; 
+                    border-bottom: 1px solid #ddd; 
+                }
+                th { 
+                    background: #34495e; 
+                    color: white; 
+                }
+                tr:hover { background: #f5f6fa; }
+                .badge {
+                    display: inline-block;
+                    padding: 3px 8px;
+                    border-radius: 3px;
+                    font-size: 12px;
+                    font-weight: bold;
+                    margin: 2px;
+                }
+                .badge-win { background: #27ae60; color: white; }
+                .badge-loss { background: #c0392b; color: white; }
+                .mejora { color: #27ae60; font-weight: bold; }
+                .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ecf0f1; color: #7f8c8d; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>🎯 Optimización de Horas a Evitar - Análisis por Máscara de Bits</h1>
+                
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="label">Fecha análisis</div>
+                        <div class="value">2026-02-28 00:45:48</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="label">Combinaciones evaluadas</div>
+                        <div class="value">16,777,216</div>
+                        <div class="sub">de 16,777,216 totales (100.00%)</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="label">Mejoras encontradas</div>
+                        <div class="value">334</div>
+                        <div class="sub">vs configuración base</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="label">Drawdown objetivo</div>
+                        <div class="value">3%</div>
+                    </div>
+                </div>
+                
+                <h2>📊 Comparativa: Base vs Optimizado</h2>
+                
+                <div class="comparison-grid">
+                    <!-- Configuración Base -->
+                    <div class="config-card original">
+                        <h3 style="color: #3498db; margin-top: 0;">⚙️ Configuración Base (Sin filtrar)</h3>
+                        <p><strong>Horas evitadas:</strong> Ninguna</p>
+                        <div class="stats-grid" style="grid-template-columns: 1fr 1fr;">
+                            <div>
+                                <div class="label">Winrate</div>
+                                <div class="value" style="font-size: 20px;">75.71%</div>
+                                <div>23138W / 7424L</div>
+                            </div>
+                            <div>
+                                <div class="label">Profit</div>
+                                <div class="value" style="font-size: 20px;">4145.00%</div>
+                            </div>
+                            <div>
+                                <div class="label">Max Drawdown</div>
+                                <div class="value" style="font-size: 20px;">48.00%</div>
+                            </div>
+                            <div>
+                                <div class="label">Valor Ajustado</div>
+                                <div class="value" style="font-size: 20px;">259.0625</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Configuración Optimizada -->
+                    <div class="config-card optimized">
+                        <h3 style="color: #27ae60; margin-top: 0;">🏆 Configuración Optimizada</h3>
+                        <p><strong>Máscara binaria:</strong> <code>110010000000100010001001</code></p>
+                        <p><strong>Horas a evitar:</strong> 
+                            <span class="badge badge-win">00:00</span><span class="badge badge-win">03:00</span><span class="badge badge-win">07:00</span><span class="badge badge-win">11:00</span><span class="badge badge-win">19:00</span><span class="badge badge-win">22:00</span><span class="badge badge-win">23:00</span>
+                        </p>
+                        <div class="stats-grid" style="grid-template-columns: 1fr 1fr;">
+                            <div>
+                                <div class="label">Winrate</div>
+                                <div class="value" style="font-size: 20px;">77.80%</div>
+                                <div class="mejora">(+2.09%)</div>
+                            </div>
+                            <div>
+                                <div class="label">Profit</div>
+                                <div class="value" style="font-size: 20px;">3807.50%</div>
+                                <div class="mejora">(+-337.50%)</div>
+                            </div>
+                            <div>
+                                <div class="label">Max Drawdown</div>
+                                <div class="value" style="font-size: 20px;">11.00%</div>
+                                <div class="mejora">
+                                    (↓ 
+                                    37.00%)
+                                </div>
+                            </div>
+                            <div>
+                                <div class="label">Valor Ajustado</div>
+                                <div class="value" style="font-size: 20px;">1038.4091</div>
+                                <div class="mejora">(+300.8%)</div>
+                            </div>
+                        </div>
+                        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.2);">
+                            <strong>Trades:</strong> 22807 (7755 eliminados)
+                        </div>
+                    </div>
+                </div>
+                
+                <h2>📈 Top 10 Configuraciones por Valor Ajustado</h2>
+                
+                <table>
+                    <tr>
+                        <th>#</th>
+                        <th>Máscara</th>
+                        <th>Horas Evitadas</th>
+                        <th>WR%</th>
+                        <th>Profit%</th>
+                        <th>Max DD%</th>
+                        <th>Valor Ajustado</th>
+                        <th>Trades</th>
+                    </tr>
+        
+                    <tr style="background: #f0fff4;">
+                        <td><strong>#1 🏆</strong></td>
+                        <td><code>110010000000100010001001</code></td>
+                        <td>00:00, 03:00, 07:00, 11:00, 19:00, 22:00, 23:00</td>
+                        <td>77.80%</td>
+                        <td>3807.50%</td>
+                        <td>11.00%</td>
+                        <td><strong>1038.4091</strong></td>
+                        <td>22807</td>
+                    </tr>
+            
+                    <tr>
+                        <td><strong>#2</strong></td>
+                        <td><code>110010000000100010001000</code></td>
+                        <td>03:00, 07:00, 11:00, 19:00, 22:00, 23:00</td>
+                        <td>77.76%</td>
+                        <td>3806.00%</td>
+                        <td>11.00%</td>
+                        <td><strong>1038.0000</strong></td>
+                        <td>22867</td>
+                    </tr>
+            
+                    <tr>
+                        <td><strong>#3</strong></td>
+                        <td><code>110010101000100010001001</code></td>
+                        <td>00:00, 03:00, 07:00, 11:00, 15:00, 17:00, 19:00, 22:00, 23:00</td>
+                        <td>78.11%</td>
+                        <td>3420.00%</td>
+                        <td>11.00%</td>
+                        <td><strong>932.7273</strong></td>
+                        <td>19917</td>
+                    </tr>
+            
+                    <tr>
+                        <td><strong>#4</strong></td>
+                        <td><code>110010101000100010001000</code></td>
+                        <td>03:00, 07:00, 11:00, 15:00, 17:00, 19:00, 22:00, 23:00</td>
+                        <td>78.07%</td>
+                        <td>3418.50%</td>
+                        <td>11.00%</td>
+                        <td><strong>932.3182</strong></td>
+                        <td>19977</td>
+                    </tr>
+            
+                    <tr>
+                        <td><strong>#5</strong></td>
+                        <td><code>110010100110100010001001</code></td>
+                        <td>00:00, 03:00, 07:00, 11:00, 13:00, 14:00, 17:00, 19:00, 22:00, 23:00</td>
+                        <td>78.09%</td>
+                        <td>3258.50%</td>
+                        <td>11.00%</td>
+                        <td><strong>888.6818</strong></td>
+                        <td>19018</td>
+                    </tr>
+            
+                    <tr>
+                        <td><strong>#6</strong></td>
+                        <td><code>110010100110100010001000</code></td>
+                        <td>03:00, 07:00, 11:00, 13:00, 14:00, 17:00, 19:00, 22:00, 23:00</td>
+                        <td>78.05%</td>
+                        <td>3257.00%</td>
+                        <td>11.00%</td>
+                        <td><strong>888.2728</strong></td>
+                        <td>19078</td>
+                    </tr>
+            
+                    <tr>
+                        <td><strong>#7</strong></td>
+                        <td><code>110010100101110010001001</code></td>
+                        <td>00:00, 03:00, 07:00, 10:00, 11:00, 12:00, 14:00, 17:00, 19:00, 22:00, 23:00</td>
+                        <td>78.02%</td>
+                        <td>3001.00%</td>
+                        <td>11.00%</td>
+                        <td><strong>818.4546</strong></td>
+                        <td>17615</td>
+                    </tr>
+            
+                    <tr>
+                        <td><strong>#8</strong></td>
+                        <td><code>110010100101110010001000</code></td>
+                        <td>03:00, 07:00, 10:00, 11:00, 12:00, 14:00, 17:00, 19:00, 22:00, 23:00</td>
+                        <td>77.98%</td>
+                        <td>2999.50%</td>
+                        <td>11.00%</td>
+                        <td><strong>818.0455</strong></td>
+                        <td>17675</td>
+                    </tr>
+            
+                    <tr>
+                        <td><strong>#9</strong></td>
+                        <td><code>110010100101101010001001</code></td>
+                        <td>00:00, 03:00, 07:00, 09:00, 11:00, 12:00, 14:00, 17:00, 19:00, 22:00, 23:00</td>
+                        <td>77.76%</td>
+                        <td>2944.00%</td>
+                        <td>11.00%</td>
+                        <td><strong>802.9091</strong></td>
+                        <td>17696</td>
+                    </tr>
+            
+                    <tr>
+                        <td><strong>#10</strong></td>
+                        <td><code>110010100101101010001000</code></td>
+                        <td>03:00, 07:00, 09:00, 11:00, 12:00, 14:00, 17:00, 19:00, 22:00, 23:00</td>
+                        <td>77.71%</td>
+                        <td>2942.50%</td>
+                        <td>11.00%</td>
+                        <td><strong>802.5000</strong></td>
+                        <td>17756</td>
+                    </tr>
+            
+                </table>
+                
+                <h2>📊 Análisis de Mejora</h2>
+                
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="label">Mejor winrate encontrado</div>
+                        <div class="value">78.11%</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="label">Mejor profit encontrado</div>
+                        <div class="value">4146.50%</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="label">Mejor drawdown</div>
+                        <div class="value">11.00%</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="label">Total configs guardadas</div>
+                        <div class="value">27</div>
+                    </div>
+                </div>
+                
+                <div class="footer">
+                    <p>Optimización completada: 16,777,216 combinaciones analizadas</p>
+                    <p>Mejor valor ajustado: 1038.4091 (objetivo: maximizar (1/DD) * 3 * Profit)</p>
+                    <p>⚡ Procesamiento con máscara de bits - 8 CPUs utilizados</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        
