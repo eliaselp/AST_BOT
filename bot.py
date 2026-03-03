@@ -57,8 +57,8 @@ def ejecutar_tareas_segun_hora(ahora):
         minuto_actual = ahora.minute
         hora_actual = ahora.hour
         en_horario = False
-        if config.HORAS_PERMITIDAS:
-            if hora_actual in config.HORAS_PERMITIDAS:
+        if config.HORAS_EVITAR:
+            if hora_actual not in config.HORAS_EVITAR:
                 en_horario = True
         else:
             en_horario =True
@@ -150,3 +150,4 @@ def main():
 if __name__ == "__main__":
 
     main()
+
