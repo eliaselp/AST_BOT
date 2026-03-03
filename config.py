@@ -6,8 +6,9 @@ TELEGRAM_TOKEN = "8308676973:AAF8Wh8BFhKzVlNlALd1UBb995ViE5JvVMQ"
 TELEGRAM_CHANNEL = "@trades_liranza"
 NOMBRE_BOT = "ELIASBOT_1H-15M\n"
 
-room_name="EURUSD"
-token="28c3189f-ff77-4fa2-b6e1-6af6b350c700"
+#nombre de sala con token master
+room_name=""
+token=""
 dominio="localhost:8000"
 
 temporalidad_operacion = '15min'
@@ -54,3 +55,4 @@ rr_ratio = 0.5
 SL_BUFFER = 8
 
 PIP_VALUE = 0.0001
+
